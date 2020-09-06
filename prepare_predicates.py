@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
@@ -45,7 +46,10 @@ def main():
         # TODO: Revisit use of string converter for modcloth NaN
         raw_data = pd.read_csv(dataset_dir / "raw" / f"df_{dataset}.csv", converters={"user_id": str})
         data = preprocess(raw_data, dataset_dir, protected_attr_map=PROTECTED_ATTR_MAPS[dataset], rating_scale=RATING_SCALE)
-        for split in range(NUM_SPLITS)
+        for split in range(NUM_SPLITS):
+            # TODO: Create validation, look into cross-validation
+            # TODO: Select proper random seeds
+            observations, test_set = train_test_split(data, test_size=1/(1+TRAIN_TEST_RATIO), random_state=split)
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
