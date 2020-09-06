@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 
+DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = ["modcloth", "electronics"]
 NUM_SPLITS = 5
 TRAIN_TEST_RATIO = 80 / 20
@@ -32,31 +33,14 @@ RATING_SCALE = [
 ]
 
 
-REPOSITORY_DIR = Path(__file__).parent.absolute()
+def main():
+    for dataset in DATASETS:
+        dataset_dir = DATASETS_DIR / dataset
+        data = load_and_preprocess(dataset_dir, dataset)
+        print(data)
 
 
-def make_attr_map_df(attr_map, file_path):
-    df = pd.DataFrame.from_records(attr_map, columns=["attr", "label"])
-    df.to_csv(file_path, index=False, header=False, sep='\t')
-    return df
-
-
-def make_index_column(map_dir, data, column_name):
-    indices, values = pd.factorize(data[column_name])
-    pd.DataFrame(values).to_csv(
-        map_dir / (column_name + '.txt'),
-        header=False,
-        sep='\t')
-    indices = pd.Series(indices).replace(-1, np.nan)
-    return pd.DataFrame(indices, columns=[column_name])
-
-
-def substitute_column(data, column_name, attr_map):
-    return data[[column_name]].replace(attr_map["attr"].to_list(), attr_map["label"].to_list())
-
-
-for dataset in DATASETS:
-    dataset_dir = REPOSITORY_DIR / "datasets" / dataset
+def load_and_preprocess(dataset_dir, dataset):
     raw_data = pd.read_csv(dataset_dir / "raw" / f"df_{dataset}.csv",
                            converters={"user_id": str})  # For modcloth NaN user
     map_dir = dataset_dir / "maps"
@@ -75,3 +59,41 @@ for dataset in DATASETS:
     model_attr_index = substitute_column(raw_data, "model_attr", protected_attr_map_df)
     rating_normalized = substitute_column(raw_data, "rating", rating_scale_df)
     # TODO: Incorporate the other attributes
+    return pd.concat(
+        [
+            user_index,
+            item_index,
+            rating_normalized,
+            user_attr_index,
+            model_attr_index,
+            brand_index,
+            category_index
+        ],
+        axis=1)
+
+
+def make_index_column(map_dir, data, column_name):
+    indices, values = pd.factorize(data[column_name])
+    pd.DataFrame(values).to_csv(
+        map_dir / (column_name + '.txt'),
+        header=False,
+        sep='\t')
+    indices = pd.Series(indices).replace(-1, np.nan).astype('Int64')
+    return pd.DataFrame(indices, columns=[column_name])
+
+
+def make_attr_map_df(attr_map, file_path):
+    df = pd.DataFrame.from_records(attr_map, columns=["attr", "label"])
+    df.to_csv(file_path, index=False, header=False, sep='\t')
+    return df
+
+
+def substitute_column(data, column_name, attr_map):
+    sub = data[[column_name]].replace(attr_map["attr"].to_list(), attr_map["label"].to_list())
+    if column_name != "rating":
+        sub = sub.astype('Int64')
+    return sub
+
+
+if __name__ == '__main__':
+    main()
