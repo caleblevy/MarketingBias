@@ -8,8 +8,8 @@ from sklearn.model_selection import train_test_split
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = ["modcloth", "electronics"]
 NUM_SPLITS = 5
-TRAIN_TEST_RATIO = 80 / 20
-WEIGHT_TRAIN_TEST_RATIO = 90 / 10
+EVAL_TRAIN_TEST_RATIO = 80 / 20
+LEARN_TRAIN_TEST_RATIO = 90 / 10
 
 PROTECTED_ATTR_MAPS = {
     # Deliberate choice to make Large == Small&Large)
@@ -52,7 +52,7 @@ def main():
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            create_split(data, predicate_dir, split, test_size=1/(1+TRAIN_TEST_RATIO), weight_test_size=1/(1+WEIGHT_TRAIN_TEST_RATIO))
+            create_split(data, predicate_dir, split, test_size=1/(1+EVAL_TRAIN_TEST_RATIO), weight_test_size=1/(1+LEARN_TRAIN_TEST_RATIO))
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -120,31 +120,47 @@ def create_split(data, predicate_dir, split, test_size, weight_test_size):
 
 def _create_predicates(full_data, train, test, output_dir):
     output_dir.mkdir(exist_ok=True)
-    _make_blocking_predicates(full_data, output_dir)
-    # Ratings in the train/test split
-    _make_predicate_file('ObservedRatings', train, ['user_id', 'item_id', 'rating'], output_dir)
-    _make_predicate_file('TargetRatings', test, ['user_id', 'item_id'], output_dir)
-    _make_predicate_file('TrueRatings', test, ['user_id', 'item_id', 'rating'], output_dir)
+    # TODO: Come up with better name to distinguish predicate comprising valid group names from predicate describing the group of a given user
+    # Blocking Predicates (TODO: Add category)
+    _make_predicate('User', full_data, 'user_id', output_dir)
+    _make_predicate('Item', full_data, 'item_id', output_dir)
+    _make_predicate('ValidUserGroup', full_data, 'user_attr', output_dir)
+    _make_predicate('ValidItemGroup', full_data, 'model_attr', output_dir)
+    _make_predicate('Brand', full_data, 'brand', output_dir)
+    _make_predicate('ItemBrand', full_data, ['item_id', 'brand'], output_dir)
+    _make_predicate('UserGroup', full_data, ['user_id', 'user_attr'], output_dir)
+    _make_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], output_dir)
+    _make_predicate('Rated', full_data, ['user_id', 'item_id'], output_dir)
+    # Average rating prior
+    _make_average_rating_predicate('AverageItemRating', train, 'item_id', output_dir)
+    _make_average_rating_predicate('AverageUserRating', train, 'user_id', output_dir)
+    _make_average_rating_predicate('AverageBrandRating', train, 'brand', output_dir)
+    #TODO: Create matrix factorization priors
     
-
-def _make_blocking_predicates(data, output_dir):
-    _make_predicate_file('User', data, 'user_id', output_dir)
-    _make_predicate_file('Item', data, 'item_id', output_dir)
-    _make_predicate_file('ValidUserGroup', data, 'user_attr', output_dir)
-    _make_predicate_file('ValidItemGroup', data, 'model_attr', output_dir)
-    _make_predicate_file('Brand', data, 'brand', output_dir)
-    # TODO: Add category
-    _make_predicate_file('ItemBrand', data, ['item_id', 'brand'], output_dir)
-    _make_predicate_file('UserGroup', data, ['user_id', 'user_attr'], output_dir)
-    _make_predicate_file('ItemGroup', data, ['item_id', 'model_attr'], output_dir)
-    _make_predicate_file('Rated', data, ['user_id', 'item_id'], output_dir)
+    # Ratings in the train/test split
+    _make_predicate('ObservedRatings', train, ['user_id', 'item_id', 'rating'], output_dir)
+    _make_predicate('TargetRatings', test, ['user_id', 'item_id'], output_dir)
+    _make_predicate('TrueRatings', test, ['user_id', 'item_id', 'rating'], output_dir)
 
 
-def _make_predicate_file(predicate_name, data, columns, directory):
+def _make_predicate(predicate_name, data, columns, output_dir):
     if isinstance(columns, str):
         columns = [columns]
-    data[columns].dropna().drop_duplicates().to_csv(
-        directory / (predicate_name + '.txt'),
+    data = data[columns].dropna().drop_duplicates()
+    _write_predicate(predicate_name, data, output_dir)
+
+
+def _make_average_rating_predicate(predicate_name, data, groupby, output_dir):
+    mean = data[[groupby, 'rating']].groupby(groupby).mean().add_prefix('average_').reset_index()
+    _write_predicate(predicate_name, mean, output_dir)
+
+
+def _write_predicate(predicate_name, data, output_dir):
+    # TODO: Add f"{predicate_name}.txt" to mapping of predicate names to file names, loaded via json
+    filepath = output_dir / f"{predicate_name}.txt"
+    print(f"Writing: {filepath}")
+    data.to_csv(
+        filepath,
         header=False,
         index=False,
         sep='\t'
