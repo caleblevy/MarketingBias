@@ -49,11 +49,10 @@ def main():
         data = preprocess(raw_data, dataset_dir, protected_attr_map=PROTECTED_ATTR_MAPS[dataset], rating_scale=RATING_SCALE)
         predicate_dir = dataset_dir / "predicates"
         predicate_dir.mkdir(exist_ok=True)
-        make_blocking_predicates(data, predicate_dir)
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            prepare_predicates(data, predicate_dir / "splits", split, test_size=1/(1+TRAIN_TEST_RATIO))
+            create_split(data, predicate_dir, split, test_size=1/(1+TRAIN_TEST_RATIO), weight_test_size=1/(1+WEIGHT_TRAIN_TEST_RATIO))
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -110,38 +109,41 @@ def _substitute_column(data, column_name, attr_map):
     return sub
 
 
-def make_blocking_predicates(data, predicate_dir):
-    blocking_dir = predicate_dir / "blocking"
-    blocking_dir.mkdir(exist_ok=True)
-    _make_predicate_file(data, 'user_id', blocking_dir, 'User')
-    _make_predicate_file(data, 'item_id', blocking_dir, 'Item')
-    _make_predicate_file(data, 'user_attr', blocking_dir, 'UserGroup')
-    _make_predicate_file(data, 'model_attr', blocking_dir, 'ItemGroup')
-    _make_predicate_file()
+def create_split(data, predicate_dir, split, test_size, weight_test_size):
+    split_dir = predicate_dir / str(split)
+    split_dir.mkdir(exist_ok=True)
+    observations, test = train_test_split(data, test_size=test_size, random_state=split)
+    observations_learn, test_learn = train_test_split(observations, test_size=weight_test_size, random_state=split)
+    _create_predicates(data, observations, test, split_dir / "eval")
+    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn")
+
+
+def _create_predicates(full_data, observations, test, output_dir):
+    output_dir.mkdir(exist_ok=True)
+    _make_blocking_predicates(full_data, output_dir)
+    
+
+def _make_blocking_predicates(data, output_dir):
+    _make_predicate_file(data, 'user_id', output_dir, 'User')
+    _make_predicate_file(data, 'item_id', output_dir, 'Item')
+    _make_predicate_file(data, 'user_attr', output_dir, 'ValidUserGroup')
+    _make_predicate_file(data, 'model_attr', output_dir, 'ValidItemGroup')
+    _make_predicate_file(data, 'brand', output_dir, 'Brand')
+    # TODO: Add category
+    _make_predicate_file(data, ['item_id', 'brand'], output_dir, 'ItemBrand')
+    _make_predicate_file(data, ['user_id', 'user_attr'], output_dir, 'UserGroup')
+    _make_predicate_file(data, ['item_id', 'model_attr'], output_dir, 'ItemGroup')
 
 
 def _make_predicate_file(data, columns, directory, predicate_name):
     if isinstance(columns, str):
         columns = [columns]
-    data[columns].drop_duplicates().to_csv(
+    data[columns].dropna().drop_duplicates().to_csv(
         directory / (predicate_name + '.txt'),
         header=False,
         index=False,
         sep='\t'
     )
-
-
-
-
-def prepare_predicates(data, splits_dir, split, test_size):
-    split_dir = splits_dir / str(split)
-    eval_dir = split_dir / "eval"
-    eval_dir.mkdir(exist_ok=True, parents=True)
-    learn_dir = splid_dir / "learn"
-    # TODO: Add learn_dirs
-    # TODO: Should we do cross-validation instead of simple split?
-    observations, test_set = train_test_split(data, test_size=test_size, random_state=split)
-    
 
 
 if __name__ == '__main__':
