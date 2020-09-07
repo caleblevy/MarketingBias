@@ -118,24 +118,29 @@ def create_split(data, predicate_dir, split, test_size, weight_test_size):
     _create_predicates(observations, observations_learn, test_learn, split_dir / "learn")
 
 
-def _create_predicates(full_data, observations, test, output_dir):
+def _create_predicates(full_data, train, test, output_dir):
     output_dir.mkdir(exist_ok=True)
     _make_blocking_predicates(full_data, output_dir)
+    # Ratings in the train/test split
+    _make_predicate_file('ObservedRatings', train, ['user_id', 'item_id', 'rating'], output_dir)
+    _make_predicate_file('TargetRatings', test, ['user_id', 'item_id'], output_dir)
+    _make_predicate_file('TrueRatings', test, ['user_id', 'item_id', 'rating'], output_dir)
     
 
 def _make_blocking_predicates(data, output_dir):
-    _make_predicate_file(data, 'user_id', output_dir, 'User')
-    _make_predicate_file(data, 'item_id', output_dir, 'Item')
-    _make_predicate_file(data, 'user_attr', output_dir, 'ValidUserGroup')
-    _make_predicate_file(data, 'model_attr', output_dir, 'ValidItemGroup')
-    _make_predicate_file(data, 'brand', output_dir, 'Brand')
+    _make_predicate_file('User', data, 'user_id', output_dir)
+    _make_predicate_file('Item', data, 'item_id', output_dir)
+    _make_predicate_file('ValidUserGroup', data, 'user_attr', output_dir)
+    _make_predicate_file('ValidItemGroup', data, 'model_attr', output_dir)
+    _make_predicate_file('Brand', data, 'brand', output_dir)
     # TODO: Add category
-    _make_predicate_file(data, ['item_id', 'brand'], output_dir, 'ItemBrand')
-    _make_predicate_file(data, ['user_id', 'user_attr'], output_dir, 'UserGroup')
-    _make_predicate_file(data, ['item_id', 'model_attr'], output_dir, 'ItemGroup')
+    _make_predicate_file('ItemBrand', data, ['item_id', 'brand'], output_dir)
+    _make_predicate_file('UserGroup', data, ['user_id', 'user_attr'], output_dir)
+    _make_predicate_file('ItemGroup', data, ['item_id', 'model_attr'], output_dir)
+    _make_predicate_file('Rated', data, ['user_id', 'item_id'], output_dir)
 
 
-def _make_predicate_file(data, columns, directory, predicate_name):
+def _make_predicate_file(predicate_name, data, columns, directory):
     if isinstance(columns, str):
         columns = [columns]
     data[columns].dropna().drop_duplicates().to_csv(
