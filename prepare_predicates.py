@@ -9,6 +9,7 @@ DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = ["modcloth", "electronics"]
 NUM_SPLITS = 5
 TRAIN_TEST_RATIO = 80 / 20
+WEIGHT_TRAIN_TEST_RATIO = 90 / 10
 
 PROTECTED_ATTR_MAPS = {
     # Deliberate choice to make Large == Small&Large)
@@ -33,15 +34,7 @@ RATING_SCALE = [
     (5, 1)
 ]
 
-PREDICATE_NAMES = {
-    "user_id": "User",
-    "item_id": "Item",
-    "rating": "Rating",
-    "user_attr": "UserGroupId",
-    "model_attr": "ItemGroupId",
-    "brand": "Brand",
-    "category": "Category",
-}
+
 # NOTE: Code conventions throughout this file:
 #        - major functions called by main()
 #        - minor functions prepended by _, grouped by caller
@@ -56,11 +49,11 @@ def main():
         data = preprocess(raw_data, dataset_dir, protected_attr_map=PROTECTED_ATTR_MAPS[dataset], rating_scale=RATING_SCALE)
         predicate_dir = dataset_dir / "predicates"
         predicate_dir.mkdir(exist_ok=True)
-        make_blocking_predicates(data, predicate)
+        make_blocking_predicates(data, predicate_dir)
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            prepare_predicates(data, dataset_dir, split, test_size=1/(1+TRAIN_TEST_RATIO))
+            prepare_predicates(data, predicate_dir / "splits", split, test_size=1/(1+TRAIN_TEST_RATIO))
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -120,17 +113,31 @@ def _substitute_column(data, column_name, attr_map):
 def make_blocking_predicates(data, predicate_dir):
     blocking_dir = predicate_dir / "blocking"
     blocking_dir.mkdir(exist_ok=True)
-    data["user_id"].to_csv(predicate_dir / "users.txt", index=False, header=False)
-    data["item_id"].to_csv(predicate_dir / "items.txt", index=False, header=False)
-    data["item_id"].to_csv(predicate_dir / "items.txt", index=False, header=False)
+    _make_predicate_file(data, 'user_id', blocking_dir, 'User')
+    _make_predicate_file(data, 'item_id', blocking_dir, 'Item')
+    _make_predicate_file(data, 'user_attr', blocking_dir, 'UserGroup')
+    _make_predicate_file(data, 'model_attr', blocking_dir, 'ItemGroup')
+    _make_predicate_file()
+
+
+def _make_predicate_file(data, columns, directory, predicate_name):
+    if isinstance(columns, str):
+        columns = [columns]
+    data[columns].drop_duplicates().to_csv(
+        directory / (predicate_name + '.txt'),
+        header=False,
+        index=False,
+        sep='\t'
+    )
 
 
 
 
-def prepare_predicates(data, dataset_dir, split, test_size):
-    split_dir = dataset_dir / "predicates" / str(split)
+def prepare_predicates(data, splits_dir, split, test_size):
+    split_dir = splits_dir / str(split)
     eval_dir = split_dir / "eval"
     eval_dir.mkdir(exist_ok=True, parents=True)
+    learn_dir = splid_dir / "learn"
     # TODO: Add learn_dirs
     # TODO: Should we do cross-validation instead of simple split?
     observations, test_set = train_test_split(data, test_size=test_size, random_state=split)
