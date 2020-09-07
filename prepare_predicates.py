@@ -33,7 +33,15 @@ RATING_SCALE = [
     (5, 1)
 ]
 
-
+PREDICATE_NAMES = {
+    "user_id": "User",
+    "item_id": "Item",
+    "rating": "Rating",
+    "user_attr": "UserGroupId",
+    "model_attr": "ItemGroupId",
+    "brand": "Brand",
+    "category": "Category",
+}
 # NOTE: Code conventions throughout this file:
 #        - major functions called by main()
 #        - minor functions prepended by _, grouped by caller
@@ -46,10 +54,13 @@ def main():
         # TODO: Revisit use of string converter for modcloth NaN
         raw_data = pd.read_csv(dataset_dir / "raw" / f"df_{dataset}.csv", converters={"user_id": str})
         data = preprocess(raw_data, dataset_dir, protected_attr_map=PROTECTED_ATTR_MAPS[dataset], rating_scale=RATING_SCALE)
+        predicate_dir = dataset_dir / "predicates"
+        predicate_dir.mkdir(exist_ok=True)
+        make_blocking_predicates(data, predicate)
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            observations, test_set = train_test_split(data, test_size=1/(1+TRAIN_TEST_RATIO), random_state=split)
+            prepare_predicates(data, dataset_dir, split, test_size=1/(1+TRAIN_TEST_RATIO))
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -104,6 +115,26 @@ def _substitute_column(data, column_name, attr_map):
     if column_name != "rating":
         sub = sub.astype('Int64')
     return sub
+
+
+def make_blocking_predicates(data, predicate_dir):
+    blocking_dir = predicate_dir / "blocking"
+    blocking_dir.mkdir(exist_ok=True)
+    data["user_id"].to_csv(predicate_dir / "users.txt", index=False, header=False)
+    data["item_id"].to_csv(predicate_dir / "items.txt", index=False, header=False)
+    data["item_id"].to_csv(predicate_dir / "items.txt", index=False, header=False)
+
+
+
+
+def prepare_predicates(data, dataset_dir, split, test_size):
+    split_dir = dataset_dir / "predicates" / str(split)
+    eval_dir = split_dir / "eval"
+    eval_dir.mkdir(exist_ok=True, parents=True)
+    # TODO: Add learn_dirs
+    # TODO: Should we do cross-validation instead of simple split?
+    observations, test_set = train_test_split(data, test_size=test_size, random_state=split)
+    
 
 
 if __name__ == '__main__':
