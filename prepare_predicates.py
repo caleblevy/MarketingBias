@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import pairwise_distances
 
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
@@ -30,16 +31,14 @@ SIMILARITY_SETTINGS = {
     "modcloth": {
         "user_required_rating_count": 3,
         "item_required_rating_count": 1,
-        "user_threshold": 0.8,
-        "item_threshold": 0.8,
-        "binarize": True
+        "user_threshold": 0.7,
+        "item_threshold": 0.7
     },
     "electronics": {
         "user_required_rating_count": 3,
         "item_required_rating_count": 1,
         "user_threshold": 0.8,
-        "item_threshold": 0.8,
-        "binarize": True
+        "item_threshold": 0.8
     },
 }
 
@@ -163,11 +162,11 @@ def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
     _make_average_rating_predicate('AverageBrandRating', train, 'brand', observations_dir)
     #TODO: Create matrix factorization priors
-    # _make_user_and_item_similarities("SimilarItems", train, observations_dir, **similarity_settings)
+    _make_user_and_item_similarities("SimilarItems", train, observations_dir, **similarity_settings)
     # Ratings in the train/test split
-    _make_predicate('Ratings', train, ['user_id', 'item_id', 'rating'], observations_dir)
-    _make_predicate('Ratings', test, ['user_id', 'item_id'], targets_dir)
-    _make_predicate('Ratings', test, ['user_id', 'item_id', 'rating'], truth_dir)
+    _make_predicate('Rating', train, ['user_id', 'item_id', 'rating'], observations_dir)
+    _make_predicate('Rating', test, ['user_id', 'item_id'], targets_dir)
+    _make_predicate('Rating', test, ['user_id', 'item_id', 'rating'], truth_dir)
 
 
 def _make_predicate(predicate_name, data, columns, output_dir):
@@ -185,17 +184,40 @@ def _make_average_rating_predicate(predicate_name, data, groupby, output_dir):
 def _make_user_and_item_similarities(predicate_name, data, output_dir,
                                      user_required_rating_count,
                                      item_required_rating_count,
-                                     user_threshold, item_threshold,
-                                     binarize):
+                                     user_threshold,
+                                     item_threshold):
     data = data[["user_id", "item_id", "rating"]]
     user_counts = data[["user_id"]].value_counts().reset_index(name='count')
     frequent_raters = user_counts[user_counts["count"] >= user_required_rating_count][["user_id"]]
     data = data.merge(frequent_raters)
-    _compute_cosine_similarity(data, "user_id", "item_id")
+    _make_cosine_similarity_predicate("SimilarItem", data, output_dir,
+                                      similarity_index="item_id",
+                                      attribute_index="user_id",
+                                      threshold=item_threshold)
+    _make_cosine_similarity_predicate("SimilarUser", data, output_dir,
+                                      similarity_index="user_id",
+                                      attribute_index="item_id",
+                                      threshold=user_threshold)
 
-
-def _compute_cosine_similarity(data, attribute_index, similarity_index):
-    expanded_data = data.set_index([attribute_index, similarity_index]).unstack()
+def _make_cosine_similarity_predicate(predicate_name, data, output_dir, similarity_index, attribute_index, threshold):
+    expanded_data = data.set_index([similarity_index, attribute_index]).unstack()
+    similarities = 1 - pairwise_distances(
+        expanded_data.fillna(0),
+        metric='cosine',
+        force_all_finite='allow-nan'
+    )
+    similarities = pd.DataFrame(
+        similarities,
+        index=expanded_data.index,
+        columns=expanded_data.index
+    ).stack()
+    similarities.index = similarities.index.set_names([f"{similarity_index}1", f"{similarity_index}2"])
+    similarities = similarities.reset_index(name="similarity")
+    similarities = similarities[
+        (similarities['similarity'] >= threshold) &
+        (similarities[f"{similarity_index}1"] < similarities[f"{similarity_index}2"])
+    ]
+    _write_predicate(predicate_name, similarities, output_dir)
 
 
 def _write_predicate(predicate_name, data, output_dir):
@@ -208,6 +230,7 @@ def _write_predicate(predicate_name, data, output_dir):
         index=False,
         sep='\t'
     )
+    
 
 
 if __name__ == '__main__':
