@@ -25,6 +25,24 @@ PROTECTED_ATTR_MAPS = {
     ]
 }
 
+# TODO: Fix argument propagation structure for similarity settings
+SIMILARITY_SETTINGS = {
+    "modcloth": {
+        "user_required_rating_count": 3,
+        "item_required_rating_count": 1,
+        "user_threshold": 0.8,
+        "item_threshold": 0.8,
+        "binarize": True
+    },
+    "electronics": {
+        "user_required_rating_count": 3,
+        "item_required_rating_count": 1,
+        "user_threshold": 0.8,
+        "item_threshold": 0.8,
+        "binarize": True
+    },
+}
+
 # Linear scaling
 RATING_SCALE = [
     (1, 0),
@@ -52,7 +70,10 @@ def main():
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            create_split(data, predicate_dir, split, test_size=1/(1+EVAL_TRAIN_TEST_RATIO), weight_test_size=1/(1+LEARN_TRAIN_TEST_RATIO))
+            create_split(data, predicate_dir, split,
+                         eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
+                         learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
+                         similarity_settings=SIMILARITY_SETTINGS[dataset])
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -109,38 +130,44 @@ def _substitute_column(data, column_name, attr_map):
     return sub
 
 
-def create_split(data, predicate_dir, split, test_size, weight_test_size):
+def create_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings):
     split_dir = predicate_dir / str(split)
     split_dir.mkdir(exist_ok=True)
-    observations, test = train_test_split(data, test_size=test_size, random_state=split)
-    observations_learn, test_learn = train_test_split(observations, test_size=weight_test_size, random_state=split)
-    _create_predicates(data, observations, test, split_dir / "eval")
-    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn")
+    observations, test = train_test_split(data, test_size=eval_test_size, random_state=split)
+    observations_learn, test_learn = train_test_split(observations, test_size=learn_test_size, random_state=split)
+    _create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
+    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
-def _create_predicates(full_data, train, test, output_dir):
+def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     output_dir.mkdir(exist_ok=True)
+    observations_dir = output_dir / "observations"
+    targets_dir = output_dir / "targets"
+    truth_dir = output_dir / "truth"
+    observations_dir.mkdir(exist_ok=True)
+    targets_dir.mkdir(exist_ok=True)
+    truth_dir.mkdir(exist_ok=True)
     # TODO: Come up with better name to distinguish predicate comprising valid group names from predicate describing the group of a given user
     # Blocking Predicates (TODO: Add category)
-    _make_predicate('User', full_data, 'user_id', output_dir)
-    _make_predicate('Item', full_data, 'item_id', output_dir)
-    _make_predicate('ValidUserGroup', full_data, 'user_attr', output_dir)
-    _make_predicate('ValidItemGroup', full_data, 'model_attr', output_dir)
-    _make_predicate('Brand', full_data, 'brand', output_dir)
-    _make_predicate('ItemBrand', full_data, ['item_id', 'brand'], output_dir)
-    _make_predicate('UserGroup', full_data, ['user_id', 'user_attr'], output_dir)
-    _make_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], output_dir)
-    _make_predicate('Rated', full_data, ['user_id', 'item_id'], output_dir)
+    _make_predicate('User', full_data, 'user_id', observations_dir)
+    _make_predicate('Item', full_data, 'item_id', observations_dir)
+    _make_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
+    _make_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
+    _make_predicate('Brand', full_data, 'brand', observations_dir)
+    _make_predicate('ItemBrand', full_data, ['item_id', 'brand'], observations_dir)
+    _make_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
+    _make_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
+    _make_predicate('Rated', full_data, ['user_id', 'item_id'], observations_dir)
     # Average rating prior
-    _make_average_rating_predicate('AverageItemRating', train, 'item_id', output_dir)
-    _make_average_rating_predicate('AverageUserRating', train, 'user_id', output_dir)
-    _make_average_rating_predicate('AverageBrandRating', train, 'brand', output_dir)
+    _make_average_rating_predicate('AverageItemRating', train, 'item_id', observations_dir)
+    _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
+    _make_average_rating_predicate('AverageBrandRating', train, 'brand', observations_dir)
     #TODO: Create matrix factorization priors
-    
+    # _make_user_and_item_similarities("SimilarItems", train, observations_dir, **similarity_settings)
     # Ratings in the train/test split
-    _make_predicate('ObservedRatings', train, ['user_id', 'item_id', 'rating'], output_dir)
-    _make_predicate('TargetRatings', test, ['user_id', 'item_id'], output_dir)
-    _make_predicate('TrueRatings', test, ['user_id', 'item_id', 'rating'], output_dir)
+    _make_predicate('Ratings', train, ['user_id', 'item_id', 'rating'], observations_dir)
+    _make_predicate('Ratings', test, ['user_id', 'item_id'], targets_dir)
+    _make_predicate('Ratings', test, ['user_id', 'item_id', 'rating'], truth_dir)
 
 
 def _make_predicate(predicate_name, data, columns, output_dir):
@@ -153,6 +180,22 @@ def _make_predicate(predicate_name, data, columns, output_dir):
 def _make_average_rating_predicate(predicate_name, data, groupby, output_dir):
     mean = data[[groupby, 'rating']].groupby(groupby).mean().add_prefix('average_').reset_index()
     _write_predicate(predicate_name, mean, output_dir)
+
+
+def _make_user_and_item_similarities(predicate_name, data, output_dir,
+                                     user_required_rating_count,
+                                     item_required_rating_count,
+                                     user_threshold, item_threshold,
+                                     binarize):
+    data = data[["user_id", "item_id", "rating"]]
+    user_counts = data[["user_id"]].value_counts().reset_index(name='count')
+    frequent_raters = user_counts[user_counts["count"] >= user_required_rating_count][["user_id"]]
+    data = data.merge(frequent_raters)
+    _compute_cosine_similarity(data, "user_id", "item_id")
+
+
+def _compute_cosine_similarity(data, attribute_index, similarity_index):
+    expanded_data = data.set_index([attribute_index, similarity_index]).unstack()
 
 
 def _write_predicate(predicate_name, data, output_dir):
