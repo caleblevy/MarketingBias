@@ -1,6 +1,9 @@
+import asyncio
+import os
 from pathlib import Path
 import shlex
 import shutil
+import tempfile
 
 import pslpython
 from pslpython.model import Model as _Model
@@ -24,19 +27,19 @@ class Model(_Model):
         super().add_predicate(Predicate(*args, **kwargs))
 
     def _load_data(self, eval_or_learn):
-        for predicate in self.get_predicates():
+        for name, predicate in self.get_predicates().items():
             predicate.clear_data()
-            observations_file = self._predicate_dir / eval_or_learn / "observations" / f"{predicate._raw_name}.txt"
-            targets_file = self._predicate_dir / eval_or_learn / "targets" / f"{predicate._raw_name}.txt"
-            truth_file = self._predicate_dir / eval_or_learn / "truth" / f"{predicate._raw_name}.txt"
+            observation_file = self._predicate_dir / eval_or_learn / "observations" / f"{name}.txt"
+            target_file = self._predicate_dir / eval_or_learn / "targets" / f"{name}.txt"
+            truth_file = self._predicate_dir / eval_or_learn / "truth" / f"{name}.txt"
             if predicate.closed():
-                predicate.add_data_file(partition.OBSERVATIONS, observations_file)
+                predicate.add_data_file(Partition.OBSERVATIONS, observation_file)
             else:
-                if observations_file.exists():
-                    predicate.add_data_file(partition.OBSERVATIONS, observations_file)
-                predicate.add_data_file(partition.TARGETS, target_file)
+                if observation_file.exists():
+                    predicate.add_data_file(Partition.OBSERVATIONS, observation_file)
+                predicate.add_data_file(Partition.TARGETS, target_file)
                 if truth_file.exists():
-                    predicate.add_data_file(partition.TRUTH, truth_file)
+                    predicate.add_data_file(Partition.TRUTH, truth_file)
 
     def infer(self, method = '', additional_cli_options=None, psl_config=None, jvm_options=None, temp_dir=None, cleanup_temp=True):
         """
