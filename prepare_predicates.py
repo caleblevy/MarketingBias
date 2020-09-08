@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -30,15 +31,13 @@ PROTECTED_ATTR_MAPS = {
 SIMILARITY_SETTINGS = {
     "modcloth": {
         "user_required_rating_count": 3,
-        "item_required_rating_count": 1,
         "user_threshold": 0.7,
-        "item_threshold": 0.7
+        "item_threshold": 0.3
     },
     "electronics": {
-        "user_required_rating_count": 3,
-        "item_required_rating_count": 1,
-        "user_threshold": 0.8,
-        "item_threshold": 0.8
+        "user_required_rating_count": 4,
+        "user_threshold": 0.3,
+        "item_threshold": 0.3
     },
 }
 
@@ -66,13 +65,16 @@ def main():
         data = preprocess(raw_data, dataset_dir, protected_attr_map=PROTECTED_ATTR_MAPS[dataset], rating_scale=RATING_SCALE)
         predicate_dir = dataset_dir / "predicates"
         predicate_dir.mkdir(exist_ok=True)
+        similarity_settings = SIMILARITY_SETTINGS[dataset]
+        with open(predicate_dir / "similarity_settings.json", 'w', encoding='utf-8') as f:
+            json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
             create_split(data, predicate_dir, split,
                          eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
                          learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
-                         similarity_settings=SIMILARITY_SETTINGS[dataset])
+                         similarity_settings=similarity_settings)
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -183,7 +185,6 @@ def _make_average_rating_predicate(predicate_name, data, groupby, output_dir):
 
 def _make_user_and_item_similarities(predicate_name, data, output_dir,
                                      user_required_rating_count,
-                                     item_required_rating_count,
                                      user_threshold,
                                      item_threshold):
     data = data[["user_id", "item_id", "rating"]]
