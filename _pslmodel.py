@@ -1,12 +1,16 @@
 import asyncio
+import csv
 import os
 from pathlib import Path
 import shlex
 import shutil
-import tempfile
+import sys
+import tempfile  # TODO: Remove the need for this import
+
+import pandas
 
 import pslpython
-from pslpython.model import Model as _Model
+from pslpython.model import Model as _Model, ModelError
 from pslpython.rule import Rule as _Rule
 from pslpython.predicate import Predicate as _Predicate
 from pslpython.partition import Partition
@@ -41,7 +45,7 @@ class Model(_Model):
                 if truth_file.exists():
                     predicate.add_data_file(Partition.TRUTH, truth_file)
 
-    def infer(self, method = '', additional_cli_options=None, psl_config=None, jvm_options=None, temp_dir=None, cleanup_temp=True):
+    def infer(self, method='', additional_cli_options=None, psl_config=None, jvm_options=None, temp_dir=None, cleanup_temp=True):
         """
         Run inference on this model.
 
@@ -68,6 +72,7 @@ class Model(_Model):
             The frame will have columns names that match the index of the argument and 'truth'.
         """
         self._load_data("eval")
+        self._output_dir.mkdir(exist_ok=True, parents=True)
         if additional_cli_options is None:
             additional_cli_options = []
         if psl_config is None:
@@ -147,42 +152,6 @@ class Model(_Model):
             data_file_path,
         ]
 
-        # Set the PSL logging level to match the logger (if not explicitly set in the additional options).
-        if (Model.PSL_LOGGING_OPTION not in psl_config):
-            psl_config[Model.PSL_LOGGING_OPTION] = Model.PYTHON_TO_PSL_LOGGING_LEVELS[logger.level]
-
-        for option in cli_options:
-            command.append(str(option))
-
-        for (key, value) in psl_config.items():
-            command.append('-D')
-            command.append("%s=%s" % (key, value))
-
-        log_callback = lambda line: Model._log_stdout(logger, line)
-
-        logger.debug("Running: `%s`." % (pslpython.util.shell_join(command)))
-        exit_status = pslpython.util.execute(command, log_callback)
-
-        if (exit_status != 0):
-            raise ModelError("PSL returned a non-zero exit status: %d." % (exit_status))
-
-    def _run_psl(self, data_file_path, rules_file_path, cli_options, psl_config, jvm_options):
-        command = [
-            self._java_path
-        ]
-
-        for option in jvm_options:
-            command.append(str(option))
-
-        command += [
-            '-jar',
-            Model.CLI_JAR_PATH,
-            '--model',
-            rules_file_path,
-            '--data',
-            data_file_path,
-        ]
-
         for option in cli_options:
             command.append(str(option))
 
@@ -195,6 +164,50 @@ class Model(_Model):
 
         if (exit_status != 0):
             raise ModelError("PSL returned a non-zero exit status: %d." % (exit_status))
+
+    def _collect_inference_results(self, inferred_dir):
+        """
+        Get the inferred data written by PSL.
+
+        Returns:
+            A dict with the keys being the predicate and the value being a dataframe with the data.
+            {predicate: frame, ...}
+            The frame will have columns names that match the index of the argument and 'truth'.
+        """
+
+        results = {}
+
+        for dirent in os.listdir(inferred_dir):
+            path = os.path.join(inferred_dir, dirent)
+
+            if (not os.path.isfile(path)):
+                continue
+
+            predicate_name = os.path.splitext(dirent)[0]
+            predicate = None
+            for possible_predicate in self._predicates.values():
+                if (possible_predicate.name().upper() == predicate_name.upper()):
+                    predicate = possible_predicate
+                    break
+
+            if (predicate is None):
+                raise ModelError("Unable to find predicate that matches name if inferred data file. Predicate name: '%s'. Inferred file path: '%s'." % (predicate_name, path))
+
+            columns = list(range(len(predicate))) + [Model.TRUTH_COLUMN_NAME]
+            data = pandas.read_csv(path, delimiter = Model.CLI_DELIM, names = columns, header = None, skiprows = None, quoting = csv.QUOTE_NONE)
+
+            # Clean up and convert types.
+            for i in range(len(data.columns) - 1):
+                if (predicate.types()[i] in Predicate.INT_TYPES):
+                    data[data.columns[i]] = data[data.columns[i]].apply(lambda val: int(val))
+                elif (predicate.types()[i] in Predicate.FLOAT_TYPES):
+                    data[data.columns[i]] = data[data.columns[i]].apply(lambda val: float(val))
+
+            data[Model.TRUTH_COLUMN_NAME] = pandas.to_numeric(data[Model.TRUTH_COLUMN_NAME])
+
+            results[predicate] = data
+
+        return results
 
 
 class Predicate(_Predicate):
@@ -209,6 +222,7 @@ class RunOutput():
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
+
 
 async def _read_stream(stream, callback):
     while True:
@@ -262,7 +276,6 @@ def execute(command, output_dir):
         command = shlex.split(command)
     print("Running: `%s`." % (pslpython.util.shell_join(command)))
     proc = run(command)
-    print(type(proc.stdout))
     with open(output_dir / "stdout.log", 'w') as f:
         f.write('\n'.join(proc.stdout))
     with open(output_dir / "stderr.log", 'w') as g:

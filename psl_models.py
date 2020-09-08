@@ -24,6 +24,7 @@ ADDITIONAL_PSL_OPTIONS = {
 
 ADDITIONAL_CLI_OPTIONS = [
     # '--postgres'
+    '--satisfaction'
 ]
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
@@ -106,11 +107,11 @@ def add_rating_priors(model, predicate_dir, square=True):
     model.add_predicate("AverageBrandRating", size=1, closed=True)
     model.add_predicate("ItemBrand", size=2, closed=True)
     # Average user rating prior
-    model.add_rule(Rule("10: UserAvg(U) & Rated(U, I) -> Rating(U, I) ^2"))
+    model.add_rule(Rule("10: AverageUserRating(U) & Rated(U, I) -> Rating(U, I) ^2"))
     # Average item rating prior
-    model.add_rule(Rule("10: ItemAvg(I) & Rated(U, I) -> Rating(U, I) ^2"))
+    model.add_rule(Rule("10: AverageItemRating(I) & Rated(U, I) -> Rating(U, I) ^2"))
     # Average 
-    model.add_rule(Rule("10: BrandAvg(B) & Rated(U, I) & Brand(I, B) -> Rating(U, I) ^2"))
+    model.add_rule(Rule("10: AverageBrandRating(B) & Rated(U, I) & ItemBrand(I, B) -> Rating(U, I) ^2"))
 
 
 # def add_mf_prior(model, predicate_dir, square=True):
