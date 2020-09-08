@@ -12,7 +12,7 @@ from pslpython.rule import Rule
 
 DATA_DIR = Path(__file__).parent.absolute() / "datasets"
 RESULT_DIR = Path(__file__).parent.absolute() / "results"
-SPLITS = [0]
+SPLITS = [0, 1, 2, 3, 4]
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
 OVERWRITE_OLD_DATA = True
@@ -61,8 +61,8 @@ def main():
             for model_name, ruleset in models.items():
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
                 model = make_model(model_name, predicate_dir, output_dir, **ruleset)
-                infer(model, output_dir)
-
+                results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
+                                      psl_config=ADDITIONAL_PSL_OPTIONS)
 
 
 def make_model(model_name, predicate_dir, output_dir,
@@ -78,20 +78,6 @@ def make_model(model_name, predicate_dir, output_dir,
     if similarities:
         add_similarities(model, predicate_dir)
     return model
-
-
-# TODO: Add run-specific cli-options
-def infer(model, output_dir):
-    results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
-                          psl_config=ADDITIONAL_PSL_OPTIONS)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    inferred_predicate_dir = output_dir / "inferred_predicates"
-    inferred_predicate_dir.mkdir(exist_ok=True)
-    for predicate in model.get_predicates().values():
-        if (predicate.closed()):
-            continue
-        out_path = inferred_predicate_dir / predicate.name()
-        results[predicate].to_csv(out_path, sep = "\t", header = False, index = False)
 
 
 def add_baselines(model, predicate_dir, sqare=True):
