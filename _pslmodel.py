@@ -101,6 +101,14 @@ class Model(_Model):
         if (cleanup_temp):
             self._cleanup_temp(temp_dir)
 
+        inferred_predicate_dir = self._output_dir / "inferred_predicates"
+        inferred_predicate_dir.mkdir(exist_ok=True)
+        for predicate in self.get_predicates().values():
+            if (predicate.closed()):
+                continue
+            out_path = inferred_predicate_dir / (predicate.name()+'.txt')
+            results[predicate].to_csv(out_path, sep = "\t", header = False, index = False)
+
         return results
 
 
