@@ -67,21 +67,13 @@ def main():
     for dataset, models in MODELS.items():
         for split in SPLITS:
             predicate_dir = DATA_DIR / dataset / "predicates" / str(split)
-            truth_file = predicate_dir / "eval" / "truth" / "Rating.txt"
-            truth = pd.read_csv(truth_file, sep='\t', names=["user_id", "item_id", "rating"])
             for model_name, ruleset in models.items():
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
                 model = make_model(model_name, predicate_dir, output_dir, **ruleset)
                 results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
                                       psl_config=ADDITIONAL_PSL_OPTIONS,
                                       print_java_output=PRINT_JAVA_OUTPUT)
-                inferred = results["Rating"]
-                inferred = inferred.rename(columns={
-                    0: "user_id",
-                    1: "item_id",
-                    "truth": "rating"
-                })
-                evaluate(truth, inferred)
+                evaluate(predicate_dir, results)
 
 
 def make_model(model_name, predicate_dir, output_dir,
