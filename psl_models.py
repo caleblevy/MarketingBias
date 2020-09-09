@@ -18,7 +18,7 @@ SPLITS = [0, 1, 2, 3, 4]
 PRINT_JAVA_OUTPUT = False
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
-OVERWRITE_OLD_DATA = True
+OVERWRITE_OLD_DATA = False
 # DRY_RUN = True
 
 ADDITIONAL_PSL_OPTIONS = {
@@ -117,6 +117,12 @@ def add_rating_priors(model, predicate_dir, square=True):
     model.add_rule("10: AverageItemRating(I) & Rated(U, I) -> Rating(U, I) ^2")
     # Average 
     model.add_rule("10: AverageBrandRating(B) & Rated(U, I) & ItemBrand(I, B) -> Rating(U, I) ^2")
+    # Average user rating prior
+    model.add_rule("10: Rating(U, I) & Rated(U, I) ->  AverageUserRating(U) ^2")
+    # Average item rating prior
+    model.add_rule("10: Rating(U, I) & Rated(U, I) -> AverageItemRating(I) ^2")
+    # Average 
+    model.add_rule("10: Rating(U, I) & Rated(U, I) & ItemBrand(I, B) -> AverageBrandRating(B)^2")
 
 
 # def add_mf_prior(model, predicate_dir, square=True):
