@@ -6,6 +6,7 @@ import shlex
 import shutil
 import sys
 import tempfile  # TODO: Remove the need for this import
+import yaml
 
 import pandas
 
@@ -109,21 +110,8 @@ class Model(_Model):
             out_path = inferred_predicate_dir / (predicate.name()+'.txt')
             results[predicate].to_csv(out_path, sep = "\t", header = False, index = False)
         self.write_rules('eval')
+        self.write_cli_datafile('eval')
         return results
-
-    def write_rules(self, extension):
-        """
-        Write out all the rules for this model.
-        Will clobber any existing rules.
-
-        Returns:
-            The path to the rules file.
-        """
-        rules_file_path = os.path.join(self._output_dir, self._name + '-' + extension + '.psl')
-        with open(rules_file_path, 'w') as file:
-            for rule in self._rules:
-                file.write(str(rule) + "\n")
-        return rules_file_path
 
 
     def _prep_run(self, temp_dir=None):
@@ -155,6 +143,10 @@ class Model(_Model):
         rules_file_path = self._write_rules(temp_dir)
 
         return temp_dir, data_file_path, rules_file_path
+
+    # TODO: Add learning
+    # TODO: Add baseline split
+    # TODO: Add writing data file
 
 
     def _run_psl(self, data_file_path, rules_file_path, cli_options, psl_config, jvm_options):
@@ -230,6 +222,72 @@ class Model(_Model):
             results[predicate] = data
 
         return results
+
+    def write_rules(self, eval_or_learn):
+        """
+        Write out all the rules for this model.
+        Will clobber any existing rules.
+
+        Returns:
+            The path to the rules file.
+        """
+        rules_file_path = os.path.join(self._output_dir, self._name + '-' + eval_or_learn + '.psl')
+        with open(rules_file_path, 'w') as file:
+            for rule in self._rules:
+                file.write(str(rule) + "\n")
+        return rules_file_path
+
+
+    def write_cli_datafile(self, eval_or_learn):
+        data_file_contents = {}
+
+        predicates = {}
+        for predicate in self._predicates.values():
+            predicate_id = predicate.name() + '/' + str(len(predicate))
+
+            types = []
+            for predicate_type in predicate.types():
+                types.append(predicate_type.value)
+
+            open_closed = 'open'
+            if (predicate.closed()):
+                open_closed = 'closed'
+
+            predicates[predicate_id] = [
+                open_closed,
+                {'types': types}
+            ]
+
+        data_file_contents['predicates'] = predicates
+
+        for partition in Partition:
+            partition_data = {}
+
+            for predicate in self._predicates.values():
+                if (partition not in predicate.data()):
+                    continue
+
+                data = predicate.data()[partition]
+                if (data is None or len(data) == 0):
+                    continue
+
+                # TODO: De-duplicate this to depend on add_prediacte
+                if partition == Partition.OBSERVATIONS:
+                    sub_dir = 'observations'
+                elif partition == Partition.TARGETS:
+                    sub_dir = 'targets'
+                elif partition == Partition.TRUTH:
+                    sub_dir = 'truth'
+                predicate_file = self._predicate_dir / eval_or_learn / sub_dir / f"{predicate.name()}.txt"
+                # relative_path = predicate_file.relative_to(self._output_dir)
+                # Make paths relative to the CLI data file for portability.
+                partition_data[predicate.name()] = os.path.relpath(predicate_file, self._output_dir)
+
+            if (len(partition_data) > 0):
+                data_file_contents[partition.value] = partition_data
+
+        with open(self._output_dir / f"{self._name}-{eval_or_learn}.data", 'w') as file:
+            yaml.dump(data_file_contents, file, default_flow_style = False)
 
 
 class Predicate(_Predicate):
