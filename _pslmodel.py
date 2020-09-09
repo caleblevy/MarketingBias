@@ -256,7 +256,7 @@ class Model:
 
             data[Model.TRUTH_COLUMN_NAME] = pandas.to_numeric(data[Model.TRUTH_COLUMN_NAME])
 
-            results[predicate] = data
+            results[predicate.name()] = data
 
         return results
 
