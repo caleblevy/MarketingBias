@@ -108,8 +108,22 @@ class Model(_Model):
                 continue
             out_path = inferred_predicate_dir / (predicate.name()+'.txt')
             results[predicate].to_csv(out_path, sep = "\t", header = False, index = False)
-
+        self.write_rules('eval')
         return results
+
+    def write_rules(self, extension):
+        """
+        Write out all the rules for this model.
+        Will clobber any existing rules.
+
+        Returns:
+            The path to the rules file.
+        """
+        rules_file_path = os.path.join(self._output_dir, self._name + '-' + extension + '.psl')
+        with open(rules_file_path, 'w') as file:
+            for rule in self._rules:
+                file.write(str(rule) + "\n")
+        return rules_file_path
 
 
     def _prep_run(self, temp_dir=None):

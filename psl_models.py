@@ -63,6 +63,7 @@ def main():
                 model = make_model(model_name, predicate_dir, output_dir, **ruleset)
                 results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
                                       psl_config=ADDITIONAL_PSL_OPTIONS)
+                print(results)
 
 
 def make_model(model_name, predicate_dir, output_dir,
@@ -84,7 +85,7 @@ def add_baselines(model, predicate_dir, sqare=True):
     model.add_predicate("Rating", size=2, closed=False)
     model.add_predicate("Rated", size=2, closed=True)
     # Negative prior
-    model.add_rule(Rule("10: !Rating(U,I) ^2"))
+    model.add_rule(Rule("1: !Rating(U,I) ^2"))
 
 
 def add_rating_priors(model, predicate_dir, square=True):
