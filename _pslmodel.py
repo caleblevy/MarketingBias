@@ -96,7 +96,7 @@ class Model(_Model):
 
         cli_options += additional_cli_options
 
-        self._run_psl(data_file_path, rules_file_path, cli_options, psl_config, jvm_options)
+        self._run_psl(data_file_path, rules_file_path, cli_options, psl_config, jvm_options, 'eval')
         results = self._collect_inference_results(inferred_dir)
 
         if (cleanup_temp):
@@ -149,7 +149,7 @@ class Model(_Model):
     # TODO: Add writing data file
 
 
-    def _run_psl(self, data_file_path, rules_file_path, cli_options, psl_config, jvm_options):
+    def _run_psl(self, data_file_path, rules_file_path, cli_options, psl_config, jvm_options, eval_or_learn):
         command = [
             self._java_path
         ]
@@ -174,7 +174,7 @@ class Model(_Model):
             command.append("%s=%s" % (key, value))
 
         "Running: `%s`." % (pslpython.util.shell_join(command))
-        exit_status = execute(command, self._output_dir)
+        exit_status = self.execute(command, eval_or_learn)
 
         if (exit_status != 0):
             raise ModelError("PSL returned a non-zero exit status: %d." % (exit_status))
@@ -289,6 +289,18 @@ class Model(_Model):
         with open(self._output_dir / f"{self._name}-{eval_or_learn}.data", 'w') as file:
             yaml.dump(data_file_contents, file, default_flow_style = False)
 
+    def execute(self, command, eval_or_learn):
+        # TODO: Add suppressors for echoing java output
+        if isinstance(command, str):
+            command = shlex.split(command)
+        print("Running: `%s`." % (pslpython.util.shell_join(command)))
+        proc = run(command)
+        with open(self._output_dir / f"{eval_or_learn}.out", 'w') as f:
+            f.write('\n'.join(proc.stdout))
+        with open(self._output_dir / f"{eval_or_learn}.err", 'w') as g:
+            g.write('\n'.join(proc.stderr))
+        return proc.returncode
+
 
 class Predicate(_Predicate):
 
@@ -350,15 +362,4 @@ def run(cmd, stdin=None, quiet=False, echo=False) -> RunOutput:
 
     return result
 
-
-def execute(command, output_dir):
-    if isinstance(command, str):
-        command = shlex.split(command)
-    print("Running: `%s`." % (pslpython.util.shell_join(command)))
-    proc = run(command)
-    with open(output_dir / "stdout.log", 'w') as f:
-        f.write('\n'.join(proc.stdout))
-    with open(output_dir / "stderr.log", 'w') as g:
-        g.write('\n'.join(proc.stderr))
-    return proc.returncode
     
