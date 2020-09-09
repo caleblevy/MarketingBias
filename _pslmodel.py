@@ -51,7 +51,7 @@ class Model:
             raise PredicateError("Within a model, predciates must have unique names. Got a duplicate: %s." % (name))
         self._predicates[predicate.name()] = predicate
 
-    def add_rule(self, rule: Rule):
+    def add_rule(self, rule_string: str, weighted: bool = None, weight: float = None, squared: bool = None):
         """
         Add a rule to the model.
 
@@ -65,7 +65,7 @@ class Model:
             This model.
         """
 
-        self._rules.append(rule)
+        self._rules.append(Rule(rule_string, weighted, weight, squared))
         return self
 
     def get_predicates(self):
@@ -95,7 +95,7 @@ class Model:
                 if truth_file.exists():
                     predicate.add_data_file(Partition.TRUTH, truth_file)
 
-    def infer(self, method='', additional_cli_options=None, psl_config=None, jvm_options=None, temp_dir=None, cleanup_temp=True):
+    def infer(self, method='', additional_cli_options=None, psl_config=None, jvm_options=None, temp_dir=None, cleanup_temp=True, print_java_output=True):
         """
         Run inference on this model.
 
@@ -146,7 +146,7 @@ class Model:
 
         cli_options += additional_cli_options
 
-        self._run_psl(data_file_path, rules_file_path, cli_options, psl_config, jvm_options, 'eval')
+        self._run_psl(data_file_path, rules_file_path, cli_options, psl_config, jvm_options, 'eval', print_java_output)
         results = self._collect_inference_results(inferred_dir)
         return results
 
@@ -186,7 +186,7 @@ class Model:
     # TODO: Add writing data file
 
 
-    def _run_psl(self, data_file_path, rules_file_path, cli_options, psl_config, jvm_options, eval_or_learn):
+    def _run_psl(self, data_file_path, rules_file_path, cli_options, psl_config, jvm_options, eval_or_learn, print_java_output):
         command = [
             self._java_path
         ]
@@ -211,7 +211,7 @@ class Model:
             command.append("%s=%s" % (key, value))
 
         "Running: `%s`." % (pslpython.util.shell_join(command))
-        exit_status = self.execute(command, eval_or_learn)
+        exit_status = self.execute(command, eval_or_learn, print_java_output)
 
         if (exit_status != 0):
             raise ModelError("PSL returned a non-zero exit status: %d." % (exit_status))
@@ -255,9 +255,7 @@ class Model:
                     data[data.columns[i]] = data[data.columns[i]].apply(lambda val: float(val))
 
             data[Model.TRUTH_COLUMN_NAME] = pandas.to_numeric(data[Model.TRUTH_COLUMN_NAME])
-
             results[predicate.name()] = data
-
         return results
 
     def write_rules(self, eval_or_learn):
@@ -327,12 +325,12 @@ class Model:
             yaml.dump(data_file_contents, file, default_flow_style = False)
         return data_file_path
 
-    def execute(self, command, eval_or_learn):
+    def execute(self, command, eval_or_learn, print_java_output):
         # TODO: Add suppressors for echoing java output
         if isinstance(command, str):
             command = shlex.split(command)
         print("Running: `%s`." % (pslpython.util.shell_join(command)))
-        proc = run(command)
+        proc = run(command, quiet=(not print_java_output))
         with open(self._output_dir / f"{eval_or_learn}.out", 'w') as f:
             f.write('\n'.join(proc.stdout))
         with open(self._output_dir / f"{eval_or_learn}.err", 'w') as g:
