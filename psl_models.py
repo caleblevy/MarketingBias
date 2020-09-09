@@ -117,7 +117,7 @@ def add_rating_priors(model, predicate_dir, square=True):
 #     model.add(Rule("10: Rated(U, I) & MF_Rating(U, I) -> Rating(U, I) ^2"))
 
 
-def add_similarities(model, predicate_dir, threshold=0.8, min_rating_count=3):
+def add_one_sided_similarities(model, predicate_dir, threshold=0.8, min_rating_count=3):
     model.add_predicate("SimilarUser", size=2, closed=True)
     model.add_predicate("SimilarItem", size=2, closed=True)
     model.add_rule(Rule("100: Rated(U1, I) & Rated(U2, I) & SimilarUser(U1, U2) & Rating(U1, I) -> Rating(U2, I) ^2"))

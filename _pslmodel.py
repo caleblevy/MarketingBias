@@ -12,11 +12,17 @@ import pandas
 
 import pslpython
 from pslpython.model import Model as _Model, ModelError
-from pslpython.rule import Rule as _Rule
+from pslpython.rule import Rule
 from pslpython.predicate import Predicate as _Predicate
 from pslpython.partition import Partition
 
-class Model(_Model):
+
+class Model:
+
+    # TODO: Decide whether to allow include jar file in github
+    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli.jar"
+    TRUTH_COLUMN_NAME = 'truth'
+    CLI_DELIM = "\t"
 
     def __init__(self, name, predicate_dir, output_dir):
         self._predicate_dir = predicate_dir
@@ -28,8 +34,51 @@ class Model(_Model):
         self._predicates = {}
         self._name = name
 
-    def add_predicate(self, *args, **kwargs):
-        super().add_predicate(Predicate(*args, **kwargs))
+    def add_predicate(self, name: str, closed: bool, size: int=None, arg_types=None):
+        """
+        Add a predicate to the model.
+        Two predicates with the same name should never be added to the same model.
+
+        Args:
+            predicate: The predicate to add.
+
+        Returns:
+            This model.
+        """
+        predicate = Predicate(name, closed, size, arg_types)
+        name = predicate.name()
+        if (name in self._predicates and predicate != self._predicates[name]):
+            raise PredicateError("Within a model, predciates must have unique names. Got a duplicate: %s." % (name))
+        self._predicates[predicate.name()] = predicate
+
+    def add_rule(self, rule: Rule):
+        """
+        Add a rule to the model.
+
+        Rules are ordered and will maintain the order they were inserted in.
+        The rule ordering does not effect inference.
+
+        Args:
+            rule: The rule to add.
+
+        Returns:
+            This model.
+        """
+
+        self._rules.append(rule)
+        return self
+
+    def get_predicates(self):
+        """
+        Get all the predicates keyed by their normalized name.
+        If you are trying to get a specific predicate by name you should use Predicate.normalize_name(),
+        or just use get_predicate() instead.
+
+        Returns:
+            A dict of predicates keyed by their normalized name.
+        """
+        return self._predicates
+
 
     def _load_data(self, eval_or_learn):
         for name, predicate in self.get_predicates().items():
@@ -82,7 +131,8 @@ class Model(_Model):
             jvm_options = []
 
         # Start original
-        temp_dir, data_file_path, rules_file_path = self._prep_run(temp_dir)
+        data_file_path = self.write_cli_datafile('eval')
+        rules_file_path = self.write_rules('eval')
 
         cli_options = []
 
@@ -90,7 +140,7 @@ class Model(_Model):
         if (method != ''):
             cli_options.append(method)
 
-        inferred_dir = os.path.join(temp_dir, Model.CLI_INFERRED_OUTPUT_DIR)
+        inferred_dir = self._output_dir / "inferred_predicates"
         cli_options.append('--output')
         cli_options.append(inferred_dir)
 
@@ -98,19 +148,6 @@ class Model(_Model):
 
         self._run_psl(data_file_path, rules_file_path, cli_options, psl_config, jvm_options, 'eval')
         results = self._collect_inference_results(inferred_dir)
-
-        if (cleanup_temp):
-            self._cleanup_temp(temp_dir)
-
-        inferred_predicate_dir = self._output_dir / "inferred_predicates"
-        inferred_predicate_dir.mkdir(exist_ok=True)
-        for predicate in self.get_predicates().values():
-            if (predicate.closed()):
-                continue
-            out_path = inferred_predicate_dir / (predicate.name()+'.txt')
-            results[predicate].to_csv(out_path, sep = "\t", header = False, index = False)
-        self.write_rules('eval')
-        self.write_cli_datafile('eval')
         return results
 
 
@@ -285,9 +322,10 @@ class Model(_Model):
 
             if (len(partition_data) > 0):
                 data_file_contents[partition.value] = partition_data
-
-        with open(self._output_dir / f"{self._name}-{eval_or_learn}.data", 'w') as file:
+        data_file_path = self._output_dir / f"{self._name}-{eval_or_learn}.data"
+        with open(data_file_path, 'w') as file:
             yaml.dump(data_file_contents, file, default_flow_style = False)
+        return data_file_path
 
     def execute(self, command, eval_or_learn):
         # TODO: Add suppressors for echoing java output

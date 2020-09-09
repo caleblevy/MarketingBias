@@ -1,6 +1,7 @@
 # Computable Data
 datasets/
 results/
+executables/
 
 # PSL Related Files
 *.jar
