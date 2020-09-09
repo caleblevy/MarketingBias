@@ -33,7 +33,13 @@ MODELS = {
         "baseline": {},
         "priors": {
             "rating_priors": True
-}}}#         },
+        },
+        "similarities": {
+            "rating_priors": True,
+            "similarities": True
+        }
+    }
+}
 #         "similarities": {
 #             "rating_priors": True,
 #             "similarities": True
@@ -111,28 +117,11 @@ def add_rating_priors(model, predicate_dir, square=True):
 #     model.add(Rule("10: Rated(U, I) & MF_Rating(U, I) -> Rating(U, I) ^2"))
 
 
-# def add_similarities(model, predicate_dir, threshold=0.8, min_rating_count=3):
-#     UserRatedK = Predicate("UserRatedK", size=1, closed=True)
-#     ItemRatedK = Predicate("ItemRatedK", size=1, closed=True)
-#     SimilarUsers = Predicate("SimilarUsers", size=2, closed=True)
-#     SimilarItems = Predicate("SimilarItems", size=2, closed=True)
-#     model.add_predicate(UserRatedK)
-#     model.add_predicate(ItemRatedK)
-#     model.add_predicate(SimilarUsers)
-#     model.add_predicate(SimilarItems)
-#
-#     # TODO change K and threshold values programatically
-#     UserRatedK.add_data_file(Partition.OBSERVATIONS, predicate_dir / 'similar_users_3.txt')
-#     ItemRatedK.add_data_file(Partition.OBSERVATIONS, predicate_dir / 'similar_items_3.txt')
-#     SimilarUsers.add_data_file(Partition.OBSERVATIONS, predicate_dir / '3_0.8_user_user_cosine_similarity.txt')
-#     SimilarItems.add_data_file(Partition.OBSERVATIONS, predicate_dir / '3_0.8_item_item_cosine_similarity.txt')
-#
-#     model.add_rule(Rule("100: Rated(U2, I) & UserRatedK(U1) & UserRatedK(U2) & SimilarUsers(U1, U2) & Rating(U1, I) -> Rating(U2, I) ^2"))
-#     model.add_rule(Rule("100: Rated(U, I2) & ItemRatedK(I1) & ItemRatedK(I2) & SimilarItems(I1, I2) & Rating(U, I1) -> Rating(U, I2) ^2"))
-
-
-# def add_value_fairness(model):
-#     pass
+def add_similarities(model, predicate_dir, threshold=0.8, min_rating_count=3):
+    model.add_predicate("SimilarUser", size=2, closed=True)
+    model.add_predicate("SimilarItem", size=2, closed=True)
+    model.add_rule(Rule("100: Rated(U1, I) & Rated(U2, I) & SimilarUser(U1, U2) & Rating(U1, I) -> Rating(U2, I) ^2"))
+    model.add_rule(Rule("100: Rated(U, I1) & Rated(U, I2) & SimilarItem(I1, I2) & Rating(U, I1) -> Rating(U, I2) ^2"))
 
 
 if (__name__ == '__main__'):
