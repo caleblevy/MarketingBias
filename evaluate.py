@@ -29,6 +29,7 @@ def f_stat(data):
         for n in model_attrs:
             market_segment = data[(data['user_attr'] == m) & (data['model_attr'] == n)]
             market_segment_average_error = market_segment['error'].mean()
+            print(m, n, market_segment.shape)
 
             V += market_segment.shape[0] * (market_segment_average_error - average_error) ** 2
 
@@ -43,22 +44,21 @@ def f_stat(data):
     return f
 
 
-def evaluate_rating(inferred, truth):
-    data = link_data(inferred, truth)
+def evaluate_rating(data):
+    f1 = f_stat(data)
+    f2, p2 = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
+    print(f"{f1=}, {f2=}, {p2=}")
 
-    true_rating = np.array(data['rating'])
-    inferred_rating = (4 * np.array(data['inferred_rating'])) + 1
-    errors = inferred_rating - true_rating
-    data['error'] = errors
-
-    print(f_stat(data))
-
-    f, p = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
-
-    mse = np.mean(errors * errors)
-    mae = np.mean(np.absolute(errors))
-
-    return {"MSE": mse, "MAE": mae,"f-stat": f,"p": p}
+    # return {"MSE": mse, "MAE": mae,"f-stat": f,"p": p}
 
 def evaluate_ranking(inferred, truth):
     pass
+
+
+if __name__ == '__main__':
+    # data = pd.read_csv("data.csv")
+    # data2 = pd.read_csv("data.csv", converters={"user_attr": str, 'model_attr': str})
+    data = pd.read_csv("test.csv")
+    data2 = pd.read_csv("test.csv", converters={"user_attr": str, 'model_attr': str})
+    evaluate_rating(data)
+    evaluate_rating(data2)
