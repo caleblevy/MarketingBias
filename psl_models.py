@@ -16,6 +16,7 @@ RESULT_DIR = Path(__file__).parent.absolute() / "results"
 SPLITS = ['baseline_split']
 
 PRINT_JAVA_OUTPUT = False
+RUN_MODEL = False
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
 OVERWRITE_OLD_DATA = False
@@ -64,11 +65,12 @@ def main():
             predicate_dir = DATA_DIR / dataset / "predicates" / str(split)
             for model_name, ruleset in models.items():
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
-                model = make_model(model_name, predicate_dir, output_dir, **ruleset)
-                results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
-                                      psl_config=ADDITIONAL_PSL_OPTIONS,
-                                      print_java_output=PRINT_JAVA_OUTPUT)
-                evaluate(predicate_dir, results)
+                if RUN_MODEL:
+                    model = make_model(model_name, predicate_dir, output_dir, **ruleset)
+                    results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
+                                          psl_config=ADDITIONAL_PSL_OPTIONS,
+                                          print_java_output=PRINT_JAVA_OUTPUT)
+                evaluate(predicate_dir, output_dir)
 
 
 def make_model(model_name, predicate_dir, output_dir,
