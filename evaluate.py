@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
-
 import argparse
 import numpy as np
 import os
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
-
-THIS_DIR = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 
 def link_data(inferred, truth):
     inferred = inferred.set_index(['user_id', 'item_id'])
@@ -17,7 +13,7 @@ def link_data(inferred, truth):
     return data
 
 def f_stat(data):
-    user_attrs = data['user_attr'].dropna().unique()
+    user_attrs = data['user_attr'].dropn.unique()
     model_attrs = data['model_attr'].dropna().unique()
     M = len(user_attrs)
     N = len(model_attrs)
