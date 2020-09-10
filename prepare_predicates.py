@@ -8,8 +8,12 @@ from sklearn.metrics import pairwise_distances
 
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
-DATASETS = ["modcloth", "electronics"]
-NUM_SPLITS = 5
+DATASETS = [
+    "modcloth",
+    "electronics"
+]
+BASELINE_SPLIT = True
+NUM_SPLITS = 0
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -30,14 +34,14 @@ PROTECTED_ATTR_MAPS = {
 # TODO: Fix argument propagation structure for similarity settings
 SIMILARITY_SETTINGS = {
     "modcloth": {
-        "user_required_rating_count": 3,
-        "user_threshold": 0.7,
-        "item_threshold": 0.3
+        "user_required_rating_count": 2,
+        "user_threshold": 0.3,
+        "item_threshold": 0.1
     },
     "electronics": {
-        "user_required_rating_count": 4,
+        "user_required_rating_count": 3,
         "user_threshold": 0.3,
-        "item_threshold": 0.3
+        "item_threshold": 0.1
     },
 }
 
@@ -68,13 +72,26 @@ def main():
         similarity_settings = SIMILARITY_SETTINGS[dataset]
         with open(predicate_dir / "similarity_settings.json", 'w', encoding='utf-8') as f:
             json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
+        if BASELINE_SPLIT:
+            create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            create_split(data, predicate_dir, split,
+            create_random_split(data, predicate_dir, split,
                          eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
                          learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
                          similarity_settings=similarity_settings)
+
+
+def create_baseline_split(data, predicate_dir, similarity_settings):
+    split_dir = predicate_dir / "baseline_split"
+    split_dir.mkdir(exist_ok=True)
+    observations = data.query("(split == 0) | (split == 1)")
+    test = data.query("split == 2")
+    observations_learn = observations.query("split == 0")
+    test_learn = observations.query("split == 1")
+    _create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
+    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -103,7 +120,8 @@ def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
             user_attr_index,
             model_attr_index,
             brand_index,
-            category_index
+            category_index,
+            raw_data[["split"]]
         ],
         axis=1)
 
@@ -131,7 +149,7 @@ def _substitute_column(data, column_name, attr_map):
     return sub
 
 
-def create_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings):
+def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings):
     split_dir = predicate_dir / str(split)
     split_dir.mkdir(exist_ok=True)
     observations, test = train_test_split(data, test_size=eval_test_size, random_state=split)
@@ -164,7 +182,7 @@ def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
     _make_average_rating_predicate('AverageBrandRating', train, 'brand', observations_dir)
     #TODO: Create matrix factorization priors
-    _make_user_and_item_similarities("SimilarItems", train, observations_dir, **similarity_settings)
+    _make_user_and_item_similarities(train, observations_dir, **similarity_settings)
     # Ratings in the train/test split
     _make_predicate('Rating', train, ['user_id', 'item_id', 'rating'], observations_dir)
     _make_predicate('Rating', test, ['user_id', 'item_id'], targets_dir)
@@ -183,7 +201,7 @@ def _make_average_rating_predicate(predicate_name, data, groupby, output_dir):
     _write_predicate(predicate_name, mean, output_dir)
 
 
-def _make_user_and_item_similarities(predicate_name, data, output_dir,
+def _make_user_and_item_similarities(data, output_dir,
                                      user_required_rating_count,
                                      user_threshold,
                                      item_threshold):

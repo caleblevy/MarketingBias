@@ -13,7 +13,7 @@ from evaluation import evaluate
 
 DATA_DIR = Path(__file__).parent.absolute() / "datasets"
 RESULT_DIR = Path(__file__).parent.absolute() / "results"
-SPLITS = [0, 1, 2, 3, 4]
+SPLITS = ['baseline_split']
 
 PRINT_JAVA_OUTPUT = False
 
@@ -41,25 +41,20 @@ MODELS = {
             "rating_priors": True,
             "similarities": True
         }
+    },
+    "electronics":{
+        "baseline": {},
+        "priors": {
+            "rating_priors": True
+        },
+        "similarities": {
+            "rating_priors": True,
+            "similarities": True
+        }
     }
 }
-#         "similarities": {
-#             "rating_priors": True,
-#             "similarities": True
-#         }
-#     },
-#
-#     "electronics":{
-#         "baseline": {},
-#         "priors": {
-#             "rating_priors": True
-#         },
-#         "similarities": {
-#             "rating_priors": True,
-#             "similarities": True
-#         }
-#     }
-# }
+
+# Need Targets
 
 
 # TODO: deal with weight learning (separate data adding)
