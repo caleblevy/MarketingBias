@@ -42,6 +42,11 @@ MODELS = {
             "rating_priors": True,
             "similarities": True
         }
+        "market_parity": {
+            "rating_priors": True,
+            "similarities": True,
+            "market_parity": True,
+        }
     },
     "electronics":{
         "baseline": {},
@@ -122,6 +127,13 @@ def add_rating_priors(model, predicate_dir, square=True):
 #
 #     # Matrix factorization prior
 #     model.add(Rule("10: Rated(U, I) & MF_Rating(U, I) -> Rating(U, I) ^2"))
+
+
+Rating(+U, I) / Max[|U|,1] = AvgItem(I) . {}
+AvgGrou(+I, )
+ValidUserGroup(UG1) & ValidItemGroup(IG1) & AverageSegmentError(UG1, IG1) =
+                                                                ValidUserGroup(UG2) & ValidItemGroup(IG2) & AverageSegmentError(UG2, IG2)
+ObservedAvgSegmentError(UG1, IG1) - Predicted(UG1, IG1) = Observed(UG2, IG2) - Predicted(UG2, IG2)
 
 
 def add_similarities(model, predicate_dir):
