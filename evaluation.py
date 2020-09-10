@@ -16,7 +16,7 @@ def evaluate(predicate_dir, output_dir):
     data["rating_truth"] = 4*data["rating_truth"] + 1
     data["rating_inferred"] = 4*data["rating_inferred"] + 1
     MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"], squared=False)
-    print(output_dir)
+    # print(output_dir)
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
     F = f_stat(predicate_dir, data)
     print(f"{MSE=}, {MAE=}, {F=}")
