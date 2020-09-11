@@ -13,7 +13,7 @@ import pandas
 import pslpython
 from pslpython.model import Model as _Model, ModelError
 from pslpython.rule import Rule
-from pslpython.predicate import Predicate as _Predicate
+from pslpython.predicate import Predicate as _Predicate, PredicateError
 from pslpython.partition import Partition
 
 
