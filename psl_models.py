@@ -16,7 +16,7 @@ RESULT_DIR = Path(__file__).parent.absolute() / "results"
 SPLITS = ['baseline_split']
 
 PRINT_JAVA_OUTPUT = True
-RUN_MODEL = False
+RUN_MODEL = True
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
 OVERWRITE_OLD_DATA = False
@@ -27,7 +27,7 @@ ADDITIONAL_PSL_OPTIONS = {
 }
 
 ADDITIONAL_CLI_OPTIONS = [
-    # '--postgres'
+    '--postgres'
     # '--satisfaction'
 ]
 
@@ -135,15 +135,6 @@ def add_rating_priors(model, predicate_dir, square=True):
     # Average 
     model.add_rule("10: Rating(U, I) & Rated(U, I) & ItemBrand(I, B) -> AverageBrandRating(B)^2")
 
-
-# def add_mf_prior(model, predicate_dir, square=True):
-#     MF_Rating = Predicate("MF_Rating", size=2, closed=True)
-#     model.add_predicate(MF_Rating)
-#
-#     MF_Rating.add_data_file(Partition.OBSERVATIONS, predicate_dir / "mf_ratings_test.txt")
-#
-#     # Matrix factorization prior
-#     model.add(Rule("10: Rated(U, I) & MF_Rating(U, I) -> Rating(U, I) ^2"))
 
 def add_similarities(model, predicate_dir):
     model.add_predicate("SimilarUser", size=2, closed=True)
