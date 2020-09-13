@@ -337,8 +337,40 @@ class Model:
             g.write('\n'.join(proc.stderr))
         return proc.returncode
 
-    def load_predicate(predicate_name, type, header):
-        
+    def load_inferred(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate(None, "inferred", predicate_name, column_names, truthiness_name)
+
+    def load_eval_observations(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("eval", "observations", predicate_name, column_names, truthiness_name)
+
+    def load_eval_targets(self, predicate_name, column_names=None):
+        return self._load_predicate("eval", "targets", predicate_name, column_names, None)
+
+    def load_eval_truth(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("eval", "truth", predicate_name, column_names, truthiness_name)
+
+    def load_learn_observations(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("learn", "observations", predicate_name, column_names, truthiness_name)
+
+    def load_learn_targets(self, predicate_name, column_names=None):
+        return self._load_predicate("learn", "targets", predicate_name, column_names, None)
+
+    def load_learn_truth(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("learn", "truth", predicate_name, column_names, truthiness_name)
+
+
+    def _load_predicate(self, eval_or_learn, partition, predicate_name, column_names, truthiness_name):
+        predicate = self._predicates[predicate_name]
+        size = len(predicate._types)
+        if partition == 'inferred':
+            filename = self._output_dir / "inferred_predicates" / f"{predicate_name.upper()}.txt"
+        else:
+            filename = self._predicate_dir / eval_or_learn / partition / f"{predicate_name}.txt"
+        if column_names is None:
+            column_names = [f"col{i}" for i in range(1, sizes+1)]
+        if partition != "targets":
+            column_names += [truthiness_name]
+        return pandas.read_csv(filename, sep='\t', names=column_names)
 
 
 class Predicate(_Predicate):

@@ -6,11 +6,10 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 
 
-def evaluate(predicate_dir, output_dir):
-    truth_file = predicate_dir / "eval" / "truth" / "Rating.txt"
-    inferred_file = output_dir / "inferred_predicates" / "RATING.txt"
-    truth = pd.read_csv(truth_file, sep='\t', names=["user_id", "item_id", "rating"])
-    inferred = pd.read_csv(inferred_file, sep='\t', names=["user_id", "item_id", "rating"])
+def evaluate(model):
+    truth = model.load_eval_truth("Rating", ["user_id", "item_id"], "rating")
+    inferred = model.load_inferred("Rating", ["user_id", "item_id"], "rating")
+    print(truth, inferred)
     data = truth.merge(inferred, on=["user_id", "item_id"], suffixes=["_truth", "_inferred"])
     # TODO: Normalize to 1 (once we can run MF code, )
     data["rating_truth"] = 4*data["rating_truth"] + 1
@@ -18,12 +17,15 @@ def evaluate(predicate_dir, output_dir):
     MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"], squared=False)
     # print(output_dir)
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
-    F = f_stat(predicate_dir, data)
+    F = f_stat(model)
     print(f"{MSE=}, {MAE=}, {F=}")
 
 
-def f_stat(predicate_dir, data):
-    item_group = pd.read_csv(predicate_dir / "eval" / "observations" / "ItemGroup.txt", sep='\t', names=["item_id", "model_attr"])
+def f_stat(model):
+    item_group = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
+    user_group = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
+    print(user_group)
+    return
     user_group = pd.read_csv(predicate_dir / "eval" / "observations" / "UserGroup.txt", sep='\t', names=["user_id", "user_attr"])
     data = data.merge(item_group, on="item_id").merge(user_group, on="user_id")
     true_ratings = np.array(data["rating_truth"])
