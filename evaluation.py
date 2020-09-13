@@ -44,7 +44,7 @@ def f_stat(predicate_dir, data):
         for n in model_attrs:
             market_segment = data[(data['user_attr'] == m) & (data['model_attr'] == n)]
             market_segment_average_error = market_segment['error'].mean()
-            # print(m, n, market_segment.shape)
+            print(m, n, market_segment.shape)
             V += market_segment.shape[0] * (market_segment_average_error - average_error) ** 2
 
             u_market_segment = 0

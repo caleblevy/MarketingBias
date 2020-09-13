@@ -16,7 +16,7 @@ RESULT_DIR = Path(__file__).parent.absolute() / "results"
 SPLITS = ['baseline_split']
 
 PRINT_JAVA_OUTPUT = True
-RUN_MODEL = True
+RUN_MODEL = False
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
 OVERWRITE_OLD_DATA = False
