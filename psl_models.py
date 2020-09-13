@@ -51,6 +51,10 @@ MODELS = {
             "rating_priors": True,
             "similarities": False,
             "mf_prior": True,
+        },
+        "average_fairness": {
+            "rating_priors": True,
+            "fairness": True
         }
     },
     "electronics":{
@@ -149,6 +153,16 @@ def add_mf_prior(model, predicate_dir):
     model.add_predicate("MFRating", size=2, closed=True)
     model.add_rule("10: MFRating(U, I) -> Rating(U, I) ^2")
     model.add_rule("10: Rating(U, I) -> MFRating(U, I) ^2")
+
+
+rating(+U, +I) / DENOMINATOR_1 = group1_avg_rating(c) . {U: group_1(U)} {I: group_1_item_block(I) & target(U,I)}
+rating(+U, +I) / DENOMINATOR_2 = group2_avg_rating(c) . {U: group_2(U)} {I: group_2_item_block(I) & target(U,I)}
+
+
+
+def add_average_fairness(model, predicate_dir):
+    model.add_predicate("MarketSegmentAverage", closed=False, size=2)
+    model.add_predicate("Rating()")
 
 
 if (__name__ == '__main__'):

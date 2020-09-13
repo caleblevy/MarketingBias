@@ -31,7 +31,7 @@ def f_stat(predicate_dir, data):
     errors = true_ratings - inferred_ratings
     data['error'] = errors
     # data.fillna('unspecified')
-    data.to_csv("test.csv", index=False)
+    data.to_csv("throwaway/test.csv", index=False)
     data = pd.read_csv("test.csv", converters={"model_attr": str, "user_attr": str})
     user_attrs = data["user_attr"].dropna().unique()
     model_attrs = data["model_attr"].dropna().unique()

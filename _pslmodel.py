@@ -337,8 +337,8 @@ class Model:
             g.write('\n'.join(proc.stderr))
         return proc.returncode
 
-    def load_predicate(predicate_name, partition):
-        pass
+    def load_predicate(predicate_name, type, header):
+        
 
 
 class Predicate(_Predicate):

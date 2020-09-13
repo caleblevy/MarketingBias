@@ -12,7 +12,6 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-BASELINE_SPLIT = True
 NUM_SPLITS = 1
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
@@ -72,8 +71,7 @@ def main():
         similarity_settings = SIMILARITY_SETTINGS[dataset]
         with open(predicate_dir / "similarity_settings.json", 'w', encoding='utf-8') as f:
             json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
-        if BASELINE_SPLIT:
-            create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
+        create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
         for split in range(NUM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
@@ -90,8 +88,8 @@ def create_baseline_split(data, predicate_dir, similarity_settings):
     test = data.query("split == 2")
     observations_learn = observations.query("split == 0")
     test_learn = observations.query("split == 1")
-    _create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
-    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
+    create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
+    create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
 def preprocess(raw_data, dataset_dir, protected_attr_map, rating_scale):
@@ -154,11 +152,11 @@ def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_s
     split_dir.mkdir(exist_ok=True)
     observations, test = train_test_split(data, test_size=eval_test_size, random_state=split)
     observations_learn, test_learn = train_test_split(observations, test_size=learn_test_size, random_state=split)
-    _create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
-    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
+    create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
+    create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
-def _create_predicates(full_data, train, test, output_dir, similarity_settings):
+def create_predicates(full_data, train, test, output_dir, similarity_settings):
     output_dir.mkdir(exist_ok=True)
     observations_dir = output_dir / "observations"
     targets_dir = output_dir / "targets"
@@ -168,15 +166,22 @@ def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     truth_dir.mkdir(exist_ok=True)
     # TODO: Come up with better name to distinguish predicate comprising valid group names from predicate describing the group of a given user
     # Blocking Predicates (TODO: Add category)
-    _make_predicate('User', full_data, 'user_id', observations_dir)
-    _make_predicate('Item', full_data, 'item_id', observations_dir)
-    _make_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
-    _make_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
-    _make_predicate('Brand', full_data, 'brand', observations_dir)
-    _make_predicate('ItemBrand', full_data, ['item_id', 'brand'], observations_dir)
-    _make_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
-    _make_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
-    _make_predicate('Rated', full_data, ['user_id', 'item_id'], observations_dir)
+    make_blocking_predicate('User', full_data, 'user_id', observations_dir)
+    make_blocking_predicate('Item', full_data, 'item_id', observations_dir)
+    make_blocking_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
+    make_blocking_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
+    make_blocking_predicate('Brand', full_data, 'brand', observations_dir)
+    make_blocking_predicate('ItemBrand', full_data, ['item_id', 'brand'], observations_dir)
+    make_blocking_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
+    make_blocking_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
+    make_blocking_predicate('Rated', full_data, ['user_id', 'item_id'], observations_dir)
+    make_blocking_predicate('Target', test, ['user_id', 'item_id'], observations_dir)
+    for U in full_data["user_attr"].dropna().unique():
+        print(f"user_id == {U}")
+        make_blocking_predicate(f"Group{U}User", full_data.query("user_attr == @U"), "user_id", observations_dir)
+    for I in full_data["model_attr"].dropna().unique():
+        make_blocking_predicate(f"Group{I}Item", full_data.query("model_attr == @I"), "item_id", observations_dir)
+    return
     # Average rating prior
     _make_average_rating_predicate('AverageItemRating', train, 'item_id', observations_dir)
     _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
@@ -185,8 +190,19 @@ def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     _make_user_and_item_similarities(train, observations_dir, **similarity_settings)
     # Ratings in the train/test split
     _make_predicate('Rating', train, ['user_id', 'item_id', 'rating'], observations_dir)
+    #Targets
     _make_predicate('Rating', test, ['user_id', 'item_id'], targets_dir)
+    _make_predicate('MarketSegmentAverage', test, ['user_attr', 'model_attr'], targets_dir)
+    # Truth
     _make_predicate('Rating', test, ['user_id', 'item_id', 'rating'], truth_dir)
+
+
+def make_blocking_predicate(predicate_name, data, columns, output_dir):
+    if isinstance(columns, str):
+        columns = [columns]
+    data = data[columns].dropna().drop_duplicates()
+    data['truthiness'] = 1
+    _write_predicate(predicate_name, data, output_dir)
 
 
 def _make_predicate(predicate_name, data, columns, output_dir):
@@ -236,6 +252,7 @@ def _make_cosine_similarity_predicate(predicate_name, data, output_dir, similari
         (similarities['similarity'] >= threshold) &
         (similarities[f"{similarity_index}1"] < similarities[f"{similarity_index}2"])
     ]
+    similarities['truthiness'] = 1
     _write_predicate(predicate_name, similarities, output_dir)
 
 
