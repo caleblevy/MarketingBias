@@ -35,7 +35,7 @@ class Model:
         self._predicates = {}
         self._name = name
 
-    def add_predicate(self, name: str, closed: bool, size: int=None, arg_types=None):
+    def add_predicate(self, name: str, closed: bool, size: int=None, arg_types=None, _is_dynamic=False):
         """
         Add a predicate to the model.
         Two predicates with the same name should never be added to the same model.
@@ -46,7 +46,7 @@ class Model:
         Returns:
             This model.
         """
-        predicate = Predicate(name, closed, size, arg_types)
+        predicate = Predicate(name, closed, size, arg_types, _is_dynamic)
         name = predicate.name()
         if (name in self._predicates and predicate != self._predicates[name]):
             raise PredicateError("Within a model, predciates must have unique names. Got a duplicate: %s." % (name))
@@ -83,7 +83,6 @@ class Model:
 
     def _load_data(self, eval_or_learn):
         for name, predicate in self.get_predicates().items():
-            print(name)
             predicate.clear_data()
             observation_file = self._predicate_dir / eval_or_learn / "observations" / f"{name}.txt"
             target_file = self._predicate_dir / eval_or_learn / "targets" / f"{name}.txt"
@@ -378,9 +377,10 @@ class Model:
 
 class Predicate(_Predicate):
 
-    def __init__(self, raw_name: str, closed: bool, size: int = None, arg_types = None):
+    def __init__(self, raw_name: str, closed: bool, size: int = None, arg_types = None, _is_dynamic=False):
         super().__init__(raw_name, closed, size, arg_types)
         self._name = raw_name
+        self._is_dynamic = _is_dynamic
 
 #
 # class Rule(_Rule):

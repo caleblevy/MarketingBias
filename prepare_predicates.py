@@ -14,7 +14,7 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-NUM_SPLITS = 1
+NUM_SPLITS = 5
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
