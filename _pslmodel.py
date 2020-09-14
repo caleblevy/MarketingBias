@@ -15,12 +15,13 @@ from pslpython.model import Model as _Model, ModelError
 from pslpython.rule import Rule
 from pslpython.predicate import Predicate as _Predicate, PredicateError
 from pslpython.partition import Partition
+from pslpython.rule import Rule as _Rule
 
 
 class Model:
 
     # TODO: Decide whether to allow include jar file in github
-    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli.jar"
+    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli-2.3.0-SNAPSHOT.jar"
     TRUTH_COLUMN_NAME = 'truth'
     CLI_DELIM = "\t"
 
@@ -82,6 +83,7 @@ class Model:
 
     def _load_data(self, eval_or_learn):
         for name, predicate in self.get_predicates().items():
+            print(name)
             predicate.clear_data()
             observation_file = self._predicate_dir / eval_or_learn / "observations" / f"{name}.txt"
             target_file = self._predicate_dir / eval_or_learn / "targets" / f"{name}.txt"
@@ -89,6 +91,7 @@ class Model:
             if predicate.closed():
                 predicate.add_data_file(Partition.OBSERVATIONS, observation_file)
             else:
+                print(target_file)
                 if observation_file.exists():
                     predicate.add_data_file(Partition.OBSERVATIONS, observation_file)
                 predicate.add_data_file(Partition.TARGETS, target_file)
@@ -367,7 +370,7 @@ class Model:
         else:
             filename = self._predicate_dir / eval_or_learn / partition / f"{predicate_name}.txt"
         if column_names is None:
-            column_names = [f"col{i}" for i in range(1, sizes+1)]
+            column_names = [f"col{i}" for i in range(1, size+1)]
         if partition != "targets":
             column_names += [truthiness_name]
         return pandas.read_csv(filename, sep='\t', names=column_names)
@@ -378,6 +381,40 @@ class Predicate(_Predicate):
     def __init__(self, raw_name: str, closed: bool, size: int = None, arg_types = None):
         super().__init__(raw_name, closed, size, arg_types)
         self._name = raw_name
+
+#
+# class Rule(_Rule):
+#
+#     def to_string(self, weight_places: int = None):
+#         """
+#         Create a PSL CLI compliant string representation of this string.
+#         Most non-testing people will just use str().
+#
+#         Args:
+#             weight_places: The number of decimal places to use.
+#                            Defaults to not caring and doing whatever "%f" does.
+#
+#         Returns:
+#             A string representation of this rule.
+#         """
+#
+#         text = []
+#
+#         if (self._weighted):
+#             if (weight_places is None):
+#                 text.append("%f:" % (self._weight))
+#             else:
+#                 format_string = "%%.%df:" % (weight_places)
+#                 text.append(format_string % (self._weight))
+#
+#         text.append(self._rule_body)
+#
+#         if (self._squared):
+#             text.append('^2')
+#         # elif (not self._weighted):
+#         #     text.append('.')
+#
+#         return ' '.join(text)
 
 
 class RunOutput():
