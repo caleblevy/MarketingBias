@@ -1,18 +1,22 @@
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import pairwise_distances
 
+sys.path.insert(0, 'matrix_factorization')
+from main import mf_rating
+
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = [
-    "modcloth",
-    "electronics"
+    #"electronics",
+    "modcloth"
 ]
-BASELINE_SPLIT = True
+BASELINE_SPLIT = False
 NUM_SPLITS = 1
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
@@ -149,13 +153,31 @@ def _substitute_column(data, column_name, attr_map):
     return sub
 
 
+def _modify_data_splits(data, split, test_size, validation_size):
+    observations, test = train_test_split(data, test_size=test_size, random_state=split)
+    train, validation = train_test_split(observations, test_size=validation_size, random_state=split)
+
+    train = train.assign(split=0)
+    validation = validation.assign(split=1)
+    test = test.assign(split=2)
+
+    observations = train.append(validation)
+    data = observations.append(test)
+
+    return data
+
+
 def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings):
     split_dir = predicate_dir / str(split)
     split_dir.mkdir(exist_ok=True)
-    observations, test = train_test_split(data, test_size=eval_test_size, random_state=split)
-    observations_learn, test_learn = train_test_split(observations, test_size=learn_test_size, random_state=split)
-    _create_predicates(data, observations, test, split_dir / "eval", similarity_settings)
-    _create_predicates(observations, observations_learn, test_learn, split_dir / "learn", similarity_settings)
+
+    data = _modify_data_splits(data, split, eval_test_size, learn_test_size)
+
+    observations_eval = data.query('split == 0 | split == 1')
+    test_eval = data.query('split == 2')
+
+    _create_predicates(data, observations_eval, test_eval, split_dir / "eval", similarity_settings)
+    #_create_predicates(data_learn, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
 def _create_predicates(full_data, train, test, output_dir, similarity_settings):
@@ -168,6 +190,7 @@ def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     truth_dir.mkdir(exist_ok=True)
     # TODO: Come up with better name to distinguish predicate comprising valid group names from predicate describing the group of a given user
     # Blocking Predicates (TODO: Add category)
+    '''
     _make_predicate('User', full_data, 'user_id', observations_dir)
     _make_predicate('Item', full_data, 'item_id', observations_dir)
     _make_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
@@ -181,12 +204,15 @@ def _create_predicates(full_data, train, test, output_dir, similarity_settings):
     _make_average_rating_predicate('AverageItemRating', train, 'item_id', observations_dir)
     _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
     _make_average_rating_predicate('AverageBrandRating', train, 'brand', observations_dir)
-    #TODO: Create matrix factorization priors
+    # Similarity
     _make_user_and_item_similarities(train, observations_dir, **similarity_settings)
     # Ratings in the train/test split
     _make_predicate('Rating', train, ['user_id', 'item_id', 'rating'], observations_dir)
     _make_predicate('Rating', test, ['user_id', 'item_id'], targets_dir)
     _make_predicate('Rating', test, ['user_id', 'item_id', 'rating'], truth_dir)
+    # MF Ratings
+    '''
+    _make_mf_predicate(full_data, observations_dir)
 
 
 def _make_predicate(predicate_name, data, columns, output_dir):
@@ -239,6 +265,11 @@ def _make_cosine_similarity_predicate(predicate_name, data, output_dir, similari
     _write_predicate(predicate_name, similarities, output_dir)
 
 
+def _make_mf_predicate(data, output_dir):
+    ratings = mf_rating(data)
+    _write_predicate('MFRatings', ratings, output_dir)
+
+
 def _write_predicate(predicate_name, data, output_dir):
     # TODO: Add f"{predicate_name}.txt" to mapping of predicate names to file names, loaded via json
     filepath = output_dir / f"{predicate_name}.txt"
@@ -249,7 +280,6 @@ def _write_predicate(predicate_name, data, output_dir):
         index=False,
         sep='\t'
     )
-    
 
 
 if __name__ == '__main__':

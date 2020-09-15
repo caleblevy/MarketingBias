@@ -1,127 +1,75 @@
-import numpy as np
-import time
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
 import pandas as pd
 import os
 import sys
 import json
 
 import argparse
+
 import dataset
-from utils import OUTPUT_DIR
 from model import MF
 
-def run_mf(DATA_NAME, METHOD_NAME, dim_set, lbda_set, lr_set, C_set,
-           protect_item_group=None, protect_user_group=None,  protect_user_item_group=None, pos_thr=4):
+def mf_rating(data, dim=10, lbda=10, learning_rate=0.001, c=0.5, batch_size=512,
+              protect_item_group=1, protect_user_group=1, protect_user_item_group=1):
+    data = data.astype('float64')
+    myData = dataset.Dataset(data)
+    
+    config = {'hidden_dim': dim,
+              'lbda': lbda,
+              'learning_rate': learning_rate,
+              'batch_size': batch_size,
+              'C': c,
+              'protect_item_group': protect_item_group,
+              'protect_user_group': protect_user_group,
+              'protect_user_item_group': protect_user_item_group}
+    myModel = MF(config)
 
-    myData = dataset.Dataset(DATA_NAME)
-    batch_size = 512
-    param_set = [(_d, _l, _lr, _C)
-                 for _d in dim_set for _l in lbda_set for _lr in lr_set for _C in C_set]
+    columns = ['user_id', 'item_id', 'rating']
 
-    print(param_set)
+    myModel.assign_data(myData.n_user, myData.n_item,
+                        myData.user_attr, myData.item_attr,
+                        myData.user_attr_ids, myData.item_attr_ids,
+                        myData.data[columns].loc[myData.data['split'] == 0].values.astype(int),
+                        myData.data[columns].loc[myData.data['split'] == 1].values.astype(int))
 
-    if METHOD_NAME in ['MF']:
+    #apply_user_item_map(ratings, myData.get_user_item_train_map())
 
-        user_item_train_map = myData.get_user_item_train_map()
+    myModel.train()
 
-        for (hidden_dim, lbda, learning_rate, C) in param_set:
-            config = {'hidden_dim': hidden_dim, 'lbda': lbda,
-                      'learning_rate': learning_rate, 'batch_size': batch_size,
-                      'C': C,
-                      'protect_item_group': protect_item_group,
-                      'protect_user_group': protect_user_group,
-                      'protect_user_item_group': protect_user_item_group}
+    columns = ['user_id', 'item_id', 'rating', 'model_attr', 'user_attr']
+    ratings = myModel.get_rating(myData.data[columns].loc[myData.data['split'] == 1],
+                                 myData.data[columns].loc[myData.data['split'] == 2])
 
-            configStr = "_".join([str(config[k]) for k in sorted(
-                list(config.keys())) if config[k] is not None])
+    ratings = apply_user_item_map(ratings, myData.user_ids, myData.item_ids)
+    ratings[['user_id', 'item_id']] = ratings[['user_id', 'item_id']].astype('Int64')
+    
+    return ratings
 
-            constr = "_".join(['%s: %s' % (str(k), str(config[k])) for k in sorted(
-                list(config.keys())) if config[k] is not None])
+def apply_user_item_map(data, user_map, item_map):
+    mapped_users = data['user_id'].values
+    mapped_items = data['item_id'].values
 
-            print(constr)
-            outputStr = os.path.join(
-                OUTPUT_DIR, DATA_NAME+"_"+METHOD_NAME+"_"+configStr)
+    original_users = [user_map[user] for user in mapped_users]
+    original_items = [item_map[item] for item in mapped_items]
 
-            start = time.time()
-            print('yo!')
-            myModel = MF(DATA_NAME, config)
+    data['user_id'] = original_users
+    data['item_id'] = original_items
 
-            columns = ['user_id', 'item_id', 'rating']
-            myModel.assign_data(myData.n_user, myData.n_item,
-                                myData.user_attr, myData.item_attr,
-                                myData.user_attr_ids, myData.item_attr_ids,
-                                myData.data[columns].loc[myData.data['split'] == 0].values.astype(int),
-                                myData.data[columns].loc[myData.data['split'] == 1].values.astype(int))
-
-            myModel.train()
-
-            columns = ['user_id', 'item_id',
-                       'rating', 'model_attr', 'user_attr']
-
-            _res = myModel.evaluate_rating(myData.data[columns].loc[myData.data['split'] == 1],
-                                           myData.data[columns].loc[myData.data['split'] == 2], outputStr)
-
-            print("Rated")
-
-            pd.DataFrame(_res,
-                         #index=['validation', 'test'],
-                         columns=['MSE', 'MAE', 'F-stat', 'p-value']).to_csv(outputStr+"_rating_results.csv")
-
-            print('Time:', int(time.time() - start))
-            '''
-            myModel.assign_user_item_train_map(user_item_train_map)
-            _res = myModel.evaluate_ranking(myData.data[columns].loc[(myData.data['split'] == 1) & (myData.data['rating'] >= pos_thr)],
-                                            myData.data[columns].loc[(myData.data['split'] == 2) & (myData.data['rating'] >= pos_thr)])
-
-            print("Ranked")
-
-            pd.DataFrame(_res,
-                         index=['validation', 'test'],
-                         columns=['NDCG', 'AUC', 'KL']).to_csv(outputStr+"_ranking_results.csv")
-            '''
+    return data
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset',
-                        help="specify a dataset from [modcloth, electronics]")
-    parser.add_argument('--method',
-                        help="specify a training method from [MF]")
-    parser.add_argument('--hidden_dim', default=10, type=int)
-    #parser.add_argument('--lbda', default=0.1, type=float)
-    parser.add_argument('--learning_rate', default=0.001, type=float)
-    #parser.add_argument('--C', default=0, type=float)
+    parser.add_argument('--dataset', help="specify a dataset from [modcloth, electronics]")
     parser.add_argument('--protect_item_group', default=1, type=int)
+    
     parser.add_argument('--protect_user_group', default=1, type=int)
     parser.add_argument('--protect_user_item_group', default=1, type=int)
 
     args = parser.parse_args()
 
-    kappa = [args.protect_item_group, args.protect_user_group, args.protect_user_item_group]
-    lbda_set = [0.01, 0.1, 1.0, 10]
-    C_set = [0.5, 1.0, 5.0, 10.0]
+    dataname = os.path.join(os.path.dirname(__file__), '..', 'datasets/modcloth/raw', 'df_' + args.dataset + '.csv')
+    data = pd.read_csv(dataname)
 
-    # vanilla MF
-    if sum(kappa) == 0:
-        run_mf(DATA_NAME=args.dataset, METHOD_NAME=args.method,
-            dim_set=[args.hidden_dim],
-            lbda_set=lbda_set,
-            lr_set=[args.learning_rate],
-            C_set=[0],
-            protect_item_group=kappa[0],
-            protect_user_group=kappa[1],
-            protect_user_item_group=kappa[2])
-    # MF with correlation losses
-    else:
-        run_mf(DATA_NAME=args.dataset, METHOD_NAME=args.method,
-            dim_set=[args.hidden_dim],
-            lbda_set=lbda_set,
-            lr_set=[args.learning_rate],
-            C_set=C_set,
-            protect_item_group=kappa[0],
-            protect_user_group=kappa[1],
-            protect_user_item_group=kappa[2])
-
-    print("IM FINISHED HERE")
+    mf_rating(data=data,
+              protect_item_group=args.protect_item_group,
+              protect_user_group=args.protect_user_group,
+              protect_user_item_group=args.protect_user_item_group)

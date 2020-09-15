@@ -1,20 +1,16 @@
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
-import pandas as pd
-import dataset
-import os
-import sys
-from utils import Model
 
+import dataset
+from utils import Model
 
 class MF(Model):
 
-    def __init__(self, DATA_NAME, config):
-        super().__init__(DATA_NAME, 'MF', config)
+    def __init__(self, config):
+        super().__init__('mf', config)
 
     def mf_block(self):
-
         n_user, n_item = self.n_user, self.n_item
         HIDDEN_DIM, LAMBDA = self.config['hidden_dim'], self.config['lbda']
 
@@ -28,7 +24,7 @@ class MF(Model):
                                    initializer=tf.random_uniform_initializer(-0.01, 0.01))
         u_emb = tf.nn.embedding_lookup(user_emb, u)
         i_emb = tf.nn.embedding_lookup(item_emb, i)
-        s = tf.reduce_sum(tf.multiply(u_emb, i_emb), 1, keep_dims=False)
+        s = tf.reduce_sum(tf.multiply(u_emb, i_emb), 1, keepdims=False)
         score = tf.tensordot(u_emb, item_emb, axes=[[1], [1]])
 
         l2_norm = tf.add_n([tf.reduce_mean(tf.multiply(u_emb, u_emb)),
@@ -103,8 +99,9 @@ class MF(Model):
         x_au = tf.one_hot(au, n_user_group)
         x_aui = tf.one_hot(aui, n_user_group)
 
-        PROTECT_ITEM, PROTECT_USER, PROTECT_USER_ITEM = self.config['protect_item_group'], self.config[
-            'protect_user_group'], self.config['protect_user_item_group']
+        PROTECT_ITEM = self.config['protect_item_group']
+        PROTECT_USER = self.config['protect_user_group']
+        PROTECT_USER_ITEM = self.config['protect_user_item_group']
 
         eps = tf.constant(1e-15)
         fstats = tf.constant(0.0)
