@@ -35,7 +35,7 @@ class Model:
         self._predicates = {}
         self._name = name
 
-    def add_predicate(self, name: str, closed: bool, size: int=None, arg_types=None, _is_dynamic=False):
+    def add_predicate(self, name: str, closed: bool, size: int=None, arg_types=None):
         """
         Add a predicate to the model.
         Two predicates with the same name should never be added to the same model.
@@ -46,7 +46,7 @@ class Model:
         Returns:
             This model.
         """
-        predicate = Predicate(name, closed, size, arg_types, _is_dynamic)
+        predicate = Predicate(name, closed, size, arg_types)
         name = predicate.name()
         if (name in self._predicates and predicate != self._predicates[name]):
             raise PredicateError("Within a model, predciates must have unique names. Got a duplicate: %s." % (name))
@@ -377,44 +377,43 @@ class Model:
 
 class Predicate(_Predicate):
 
-    def __init__(self, raw_name: str, closed: bool, size: int = None, arg_types = None, _is_dynamic=False):
+    def __init__(self, raw_name: str, closed: bool, size: int = None, arg_types = None):
         super().__init__(raw_name, closed, size, arg_types)
         self._name = raw_name
-        self._is_dynamic = _is_dynamic
 
-#
-# class Rule(_Rule):
-#
-#     def to_string(self, weight_places: int = None):
-#         """
-#         Create a PSL CLI compliant string representation of this string.
-#         Most non-testing people will just use str().
-#
-#         Args:
-#             weight_places: The number of decimal places to use.
-#                            Defaults to not caring and doing whatever "%f" does.
-#
-#         Returns:
-#             A string representation of this rule.
-#         """
-#
-#         text = []
-#
-#         if (self._weighted):
-#             if (weight_places is None):
-#                 text.append("%f:" % (self._weight))
-#             else:
-#                 format_string = "%%.%df:" % (weight_places)
-#                 text.append(format_string % (self._weight))
-#
-#         text.append(self._rule_body)
-#
-#         if (self._squared):
-#             text.append('^2')
-#         # elif (not self._weighted):
-#         #     text.append('.')
-#
-#         return ' '.join(text)
+
+class Rule(_Rule):
+
+    def to_string(self, weight_places: int = None):
+        """
+        Create a PSL CLI compliant string representation of this string.
+        Most non-testing people will just use str().
+
+        Args:
+            weight_places: The number of decimal places to use.
+                           Defaults to not caring and doing whatever "%f" does.
+
+        Returns:
+            A string representation of this rule.
+        """
+
+        text = []
+
+        if (self._weighted):
+            if (weight_places is None):
+                text.append("%f:" % (self._weight))
+            else:
+                format_string = "%%.%df:" % (weight_places)
+                text.append(format_string % (self._weight))
+
+        text.append(self._rule_body)
+
+        if (self._squared):
+            text.append('^2')
+        # elif (not self._weighted):
+        #     text.append('.')
+
+        return ' '.join(text)
 
 
 class RunOutput():

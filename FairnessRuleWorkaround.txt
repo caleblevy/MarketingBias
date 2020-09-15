@@ -1,0 +1,11 @@
+// Ideal
+Rating(+U, +I) / |U, I| = PredictedMarketSegmentRating(ug, ig) .
+		{(U, I): ItemGroup(I, ig) & UserGroup(U, ug) & Target(U, I)}
+
+
+// Workaround
+Rating(+U, I) / |U| = PredictedItemRatings(user_group, I) .
+		{U: UserGroup(U, user_group) & Target(U, I)}
+
+PredictedItemRatings(user_group, +I) / |I| = PredictedMarketSegmentRating(user_group, item_group) .
+		{I: ItemGroup(I, item_group)}
