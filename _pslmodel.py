@@ -21,7 +21,7 @@ from pslpython.rule import Rule as _Rule
 class Model:
 
     # TODO: Decide whether to allow include jar file in github
-    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli-2.3.0-SNAPSHOT.jar"
+    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli-2.2.2.jar"
     TRUTH_COLUMN_NAME = 'truth'
     CLI_DELIM = "\t"
 
@@ -90,7 +90,6 @@ class Model:
             if predicate.closed():
                 predicate.add_data_file(Partition.OBSERVATIONS, observation_file)
             else:
-                print(target_file)
                 if observation_file.exists():
                     predicate.add_data_file(Partition.OBSERVATIONS, observation_file)
                 predicate.add_data_file(Partition.TARGETS, target_file)

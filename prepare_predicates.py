@@ -14,7 +14,7 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-NUM_SPLITS = 5
+NUM_SPLITS = 0
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -178,12 +178,9 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings):
     # Fairness
     make_blocking_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
     make_blocking_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
-    for U in full_data["user_attr"].dropna().unique():
-        make_blocking_predicate(f"Group{U}User", full_data.query("user_attr == @U"), "user_id", observations_dir)
-    for I in full_data["model_attr"].dropna().unique():
-        make_blocking_predicate(f"Group{I}Item", full_data.query("model_attr == @I"), "item_id", observations_dir)
     _make_average_rating_predicate("AverageObservedSegmentRating", train, ["user_attr", "model_attr"], observations_dir)
     _make_predicate("AveragePredictedSegmentRating", full_data, ["user_attr", "model_attr"], targets_dir)
+    _make_predicate("AverageItemRatingByUG", test, ["user_attr", "item_id"], targets_dir)
     # Diagnostic
     make_blocking_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
     make_blocking_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)

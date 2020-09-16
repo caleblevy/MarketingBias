@@ -31,7 +31,8 @@ ADDITIONAL_PSL_OPTIONS = {
 }
 
 ADDITIONAL_CLI_OPTIONS = [
-    '--postgres'
+    '--postgres',
+    '--int-ids'
     # '--satisfaction'
 ]
 
@@ -54,10 +55,10 @@ MODELS = {
     #     "matrix_factorization_prior",
     #     "similarities"
     # }
-    "parity_fairness": {
+    "user_parity_fairness": {
         "rating_priors",
         "similarities",
-        "value_fairness"
+        "user_parity_fairness"
     }
 }
 
@@ -104,8 +105,8 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
         add_mf_prior(model)
     if "similarities" in ruleset:
         add_similarities(model)
-    if "value_fairness" in ruleset:
-        add_value_fairness(model)
+    if "user_parity_fairness" in ruleset:
+        add_user_parity_fairness(model)
     return model
 
 
@@ -155,24 +156,33 @@ def add_mf_prior(model):
     model.add_rule("10: Rating(U, I) -> MFRating(U, I) ^2")
 
 
-def add_value_fairness(model):
+def _prepare_user_rating_averages(model):
+    model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
+    model.add_predicate("AverageItemRatingByUG", closed=False, size=2)
+    model.add_rule(
+        "Rating(+U, I) / |U| = AverageItemRatingByUG(UG, I) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=False
+    )
+    model.add_rule(
+        "AverageItemRatingByUG(UG, +I) / |I| = AveragePredictedSegmentRating(UG, IG) . {I: ItemGroup(I, IG)}", weighted=False
+    )
+
+
+def add_user_parity_fairness(model):
+    _prepare_user_rating_averages(model)
+    # TODO: Write out unique segments in a for-loop, since arithmetic rules don't support != predicate
+    model.add_rule(
+        "10: AveragePredictedSegmentRating(UG1, IG1) = AveragePredictedSegmentRating(UG2, IG2)"
+    )
+
+
+
+def _add_global_rating_averages(model):
     model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
     Target = model.load_eval_observations("Target", ["user_id", "item_id"]).iloc[:, :-1]
     UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
     ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
     user_attrs = model.load_eval_observations("ValidUserGroup")["col1"].unique()
     item_attrs = model.load_eval_observations("ValidItemGroup")["col1"].unique()
-    for u in user_attrs:
-        model.add_predicate(f"Group{u}User", closed=True, size=1)
-        user_groups[u] = model.load_eval_observations(f"Group{u}User", ["user_id"]).iloc[:, :-1]
-    for i in item_attrs:
-        model.add_predicate(f"Group{i}Item", closed=True, size=1)
-        item_groups[i] = model.load_eval_observations(f"Group{i}Item", ["item_id"]).iloc[:, :-1]
-    for u in user_attrs:
-        for i in item_attrs:
-            normalization = max(1, len(Target.merge(user_groups[u]).merge(item_groups[i])))
-            model.add_rule(f"Rating(+U, +I) / {normalization} = AveragePredictedSegmentRating('{u}', '{i}') . {{U: Target(U, I) & Group{u}User(U)}} {{I: Target(U, I) & Group{i}Item(I)}}")
-    model.add_rule("10: AveragePredictedSegmentRating(UG1, IG1) = AveragePredictedSegmentRating(UG2, IG2)")
 
 
 if (__name__ == '__main__'):
