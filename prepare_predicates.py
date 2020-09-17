@@ -73,6 +73,7 @@ def main():
         # TODO: Revisit use of string converter for modcloth NaN
         raw_data = pd.read_csv(dataset_dir / "raw" / f"df_{dataset}.csv", converters={"user_id": str})
         data = preprocess(raw_data, dataset_dir, protected_attr_map=PROTECTED_ATTR_MAPS[dataset], rating_scale=RATING_SCALE)
+        data.to_csv('throwaway/' + dataset+'.csv')
         predicate_dir = dataset_dir / "predicates"
         predicate_dir.mkdir(exist_ok=True)
         similarity_settings = SIMILARITY_SETTINGS[dataset]
@@ -214,7 +215,7 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     # segment by rating
     _make_average_rating_predicate("ObsSegmentAvg", train, ["user_attr", "model_attr"], observations_dir)
     _make_predicate("TargetSegmentAvg", test, ["user_attr", "model_attr"], targets_dir)
-    _make_predicate("ItemSumByUG", test, ["item_id", "user_attr"], targets_dir)
+    _make_predicate("ItemSum", test, ["item_id", "user_attr", "model_attr"], targets_dir)
     # segment by item
     make_segment_average_predicate_by("ObsSegmentItemAvg", train, "item_id", observations_dir)
     _make_predicate("TargetSegmentItemAvg", test, ["user_attr", "model_attr"], targets_dir)
@@ -231,8 +232,6 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     # ---- MATRIX FACTORIZATION ----
     if mf:
         _make_mf_predicate(full_data, observations_dir)
-    exit()
-
 
 
 def make_segment_average_predicate_by(predicate_name, data, by, output_dir):

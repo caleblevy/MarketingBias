@@ -32,7 +32,8 @@ ADDITIONAL_PSL_OPTIONS = {
 
 ADDITIONAL_CLI_OPTIONS = [
     '--postgres',
-    '--int-ids'
+    '--int-ids',
+    '--groundrules', 'throwaway/ground.txt'
     # '--satisfaction'
 ]
 
@@ -106,7 +107,9 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
     if "similarities" in ruleset:
         add_similarities(model)
     if "user_parity_fairness" in ruleset:
-        add_user_parity_fairness(model)
+        _prepare_segment_average_predicates(model)
+        # exit()
+        # add_user_parity_fairness(model)
     return model
 
 
@@ -156,6 +159,34 @@ def add_mf_prior(model):
     model.add_rule("10: Rating(U, I) -> MFRating(U, I) ^2")
 
 
+def _prepare_segment_average_predicates(model):
+    model.add_predicate("TargetSegmentAvg", size=2, closed=False)
+    model.add_predicate("ItemSum", size=3, closed=False)
+    UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
+    ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
+    Target = model.load_eval_observations("Target", ["user_id", "item_id"])
+    user_groups = model.load_eval_observations("ValidUserGroup")["col1"].unique()
+    item_groups = model.load_eval_observations("ValidItemGroup")["col1"].unique()
+    for ug in user_groups:
+        for ig in item_groups:
+            segment = (Target.merge(UserGroup.query("user_attr == @ug"), on="user_id")
+                             .merge(ItemGroup.query("model_attr == @ig"), on="item_id")
+                      )
+            segment_size = len(segment)
+            rule = f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}"
+            print(rule)
+            model.add_rule(
+                f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}",
+                weighted=False
+            )
+            rule =  f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}"
+            print(rule)
+            model.add_rule(
+                f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}",
+                weighted=False
+            )
+
+
 def _prepare_user_rating_averages(model):
     model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
     model.add_predicate("AverageItemRatingByUG", closed=False, size=2)
@@ -179,10 +210,6 @@ def add_user_parity_fairness(model):
 def _add_global_rating_averages(model):
     model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
     Target = model.load_eval_observations("Target", ["user_id", "item_id"]).iloc[:, :-1]
-    UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
-    ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
-    user_attrs = model.load_eval_observations("ValidUserGroup")["col1"].unique()
-    item_attrs = model.load_eval_observations("ValidItemGroup")["col1"].unique()
 
 
 if (__name__ == '__main__'):
