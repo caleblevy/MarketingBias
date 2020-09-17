@@ -15,12 +15,13 @@ from pslpython.model import Model as _Model, ModelError
 from pslpython.rule import Rule
 from pslpython.predicate import Predicate as _Predicate, PredicateError
 from pslpython.partition import Partition
+from pslpython.rule import Rule as _Rule
 
 
 class Model:
 
     # TODO: Decide whether to allow include jar file in github
-    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli.jar"
+    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli-2.2.2.jar"
     TRUTH_COLUMN_NAME = 'truth'
     CLI_DELIM = "\t"
 
@@ -337,12 +338,81 @@ class Model:
             g.write('\n'.join(proc.stderr))
         return proc.returncode
 
+    def load_inferred(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate(None, "inferred", predicate_name, column_names, truthiness_name)
+
+    def load_eval_observations(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("eval", "observations", predicate_name, column_names, truthiness_name)
+
+    def load_eval_targets(self, predicate_name, column_names=None):
+        return self._load_predicate("eval", "targets", predicate_name, column_names, None)
+
+    def load_eval_truth(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("eval", "truth", predicate_name, column_names, truthiness_name)
+
+    def load_learn_observations(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("learn", "observations", predicate_name, column_names, truthiness_name)
+
+    def load_learn_targets(self, predicate_name, column_names=None):
+        return self._load_predicate("learn", "targets", predicate_name, column_names, None)
+
+    def load_learn_truth(self, predicate_name, column_names=None, truthiness_name="truthiness"):
+        return self._load_predicate("learn", "truth", predicate_name, column_names, truthiness_name)
+
+
+    def _load_predicate(self, eval_or_learn, partition, predicate_name, column_names, truthiness_name):
+        predicate = self._predicates[predicate_name]
+        size = len(predicate._types)
+        if partition == 'inferred':
+            filename = self._output_dir / "inferred_predicates" / f"{predicate_name.upper()}.txt"
+        else:
+            filename = self._predicate_dir / eval_or_learn / partition / f"{predicate_name}.txt"
+        if column_names is None:
+            column_names = [f"col{i}" for i in range(1, size+1)]
+        if partition != "targets":
+            column_names += [truthiness_name]
+        return pandas.read_csv(filename, sep='\t', names=column_names)
+
 
 class Predicate(_Predicate):
 
     def __init__(self, raw_name: str, closed: bool, size: int = None, arg_types = None):
         super().__init__(raw_name, closed, size, arg_types)
         self._name = raw_name
+
+
+class Rule(_Rule):
+
+    def to_string(self, weight_places: int = None):
+        """
+        Create a PSL CLI compliant string representation of this string.
+        Most non-testing people will just use str().
+
+        Args:
+            weight_places: The number of decimal places to use.
+                           Defaults to not caring and doing whatever "%f" does.
+
+        Returns:
+            A string representation of this rule.
+        """
+
+        text = []
+
+        if (self._weighted):
+            if (weight_places is None):
+                text.append("%f:" % (self._weight))
+            else:
+                format_string = "%%.%df:" % (weight_places)
+                text.append(format_string % (self._weight))
+
+        text.append(self._rule_body)
+
+        if (self._squared):
+            text.append('^2')
+        # elif (not self._weighted):
+        #     text.append('.')
+
+        return ' '.join(text)
 
 
 class RunOutput():
