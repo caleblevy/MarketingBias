@@ -199,29 +199,53 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     make_blocking_predicate('ItemBrand', full_data, ['item_id', 'brand'], observations_dir)
     make_blocking_predicate('Rated', full_data, ['user_id', 'item_id'], observations_dir)
     make_blocking_predicate('Target', test, ['user_id', 'item_id'], observations_dir)
-    # ---- FAIRNESS PREDICATES
-    make_blocking_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
-    make_blocking_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
-    _make_average_rating_predicate("AverageObservedSegmentRating", train, ["user_attr", "model_attr"], observations_dir)
-    _make_predicate("AveragePredictedSegmentRating", full_data, ["user_attr", "model_attr"], targets_dir)
-    _make_predicate("AverageItemRatingByUG", test, ["user_attr", "item_id"], targets_dir)
-    make_blocking_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
-    make_blocking_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
     # ---- AVERAGE RATING PRIORS ----
     _make_average_rating_predicate('AverageItemRating', train, 'item_id', observations_dir)
     _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
     _make_average_rating_predicate('AverageBrandRating', train, 'brand', observations_dir)
     # ---- SIMILARITIES ----
     make_cosine_similarities(train, observations_dir, **similarity_settings)
+    # ---- FAIRNESS PREDICATES ----
+    # group blockings
+    make_blocking_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
+    make_blocking_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
+    make_blocking_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
+    make_blocking_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
+    # segment by rating
+    _make_average_rating_predicate("ObsSegmentAvg", train, ["user_attr", "model_attr"], observations_dir)
+    _make_predicate("TargetSegmentAvg", test, ["user_attr", "model_attr"], targets_dir)
+    _make_predicate("ItemSumByUG", test, ["item_id", "user_attr"], targets_dir)
+    # segment by item
+    make_segment_average_predicate_by("ObsSegmentItemAvg", train, "item_id", observations_dir)
+    _make_predicate("TargetSegmentItemAvg", test, ["user_attr", "model_attr"], targets_dir)
+    _make_predicate("ItemAvgByUG", test, ["item_id", "user_attr"], targets_dir)
+    # segment by user
+    make_segment_average_predicate_by("ObsSegmentUserAvg", train, "user_id", observations_dir)
+    _make_predicate("TargetSegmentUserAvg", test, ["user_attr", "model_attr"], targets_dir)
+    _make_predicate("UserAvgByIG", test, ["user_id", "model_attr"], targets_dir)
+    # ---- RATING PREDICATES ----
     # Ratings in the train/test split
     _make_predicate('Rating', train, ['user_id', 'item_id', 'rating'], observations_dir)
-    #Targets
     _make_predicate('Rating', test, ['user_id', 'item_id'], targets_dir)
-    # Truth
     _make_predicate('Rating', test, ['user_id', 'item_id', 'rating'], truth_dir)
-    # MF Ratings
+    # ---- MATRIX FACTORIZATION ----
     if mf:
         _make_mf_predicate(full_data, observations_dir)
+    exit()
+
+
+
+def make_segment_average_predicate_by(predicate_name, data, by, output_dir):
+    data = (data[["user_attr", "model_attr", by, "rating"]]
+                .dropna()
+                .groupby(["user_attr", "model_attr", by])
+                .mean("rating")
+                .reset_index()
+                .groupby(["user_attr", "model_attr"])
+                .mean("rating")
+                .reset_index()[["user_attr", "model_attr", "rating"]]
+            )
+    _write_predicate(predicate_name, data, output_dir)
 
 
 def make_blocking_predicate(predicate_name, data, columns, output_dir):
