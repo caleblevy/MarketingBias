@@ -17,7 +17,8 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-BASELINE_SPLIT = False
+BASELINE_SPLIT = True
+COMPUTE_MF_RATINGS = False
 NUM_SPLITS = 1
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
@@ -86,7 +87,8 @@ def main():
             create_random_split(data, predicate_dir, split,
                          eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
                          learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
-                         similarity_settings=similarity_settings)
+                         similarity_settings=similarity_settings,
+                         compute_mf_ratings=COMPUTE_MF_RATINGS)
 
 
 def create_baseline_split(data, predicate_dir, similarity_settings):
@@ -169,7 +171,7 @@ def _modify_data_splits(data, split, test_size, validation_size):
     return data
 
 
-def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings):
+def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings, compute_mf_ratings):
     split_dir = predicate_dir / str(split)
     split_dir.mkdir(exist_ok=True)
     data = _modify_data_splits(data, split, eval_test_size, learn_test_size)
@@ -177,7 +179,7 @@ def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_s
     test_eval = data.query('split == 2')
     observations_learn = data.query('split == 0')
     test_learn = data.query('split == 1')
-    create_predicates(data, observations_eval, test_eval, split_dir / "eval", similarity_settings, mf=True)
+    create_predicates(data, observations_eval, test_eval, split_dir / "eval", similarity_settings, mf=compute_mf_ratings)
     create_predicates(observations_eval, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
