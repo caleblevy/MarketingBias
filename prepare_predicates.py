@@ -19,7 +19,7 @@ DATASETS = [
 ]
 BASELINE_SPLIT = True
 COMPUTE_MF_RATINGS = False
-NUM_SPLITS = 1
+NUM_SPLITS = 0
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -192,28 +192,27 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     targets_dir.mkdir(exist_ok=True)
     truth_dir.mkdir(exist_ok=True)
     # TODO: Come up with better name to distinguish predicate comprising valid group names from predicate describing the group of a given user
-    # Blocking Predicates (TODO: Add category)
+    # ---- BLOCKING PREDICATES ---- (TODO: Add category)
     make_blocking_predicate('User', full_data, 'user_id', observations_dir)
     make_blocking_predicate('Item', full_data, 'item_id', observations_dir)
     make_blocking_predicate('Brand', full_data, 'brand', observations_dir)
     make_blocking_predicate('ItemBrand', full_data, ['item_id', 'brand'], observations_dir)
     make_blocking_predicate('Rated', full_data, ['user_id', 'item_id'], observations_dir)
     make_blocking_predicate('Target', test, ['user_id', 'item_id'], observations_dir)
-    # Fairness
+    # ---- FAIRNESS PREDICATES
     make_blocking_predicate('ValidUserGroup', full_data, 'user_attr', observations_dir)
     make_blocking_predicate('ValidItemGroup', full_data, 'model_attr', observations_dir)
     _make_average_rating_predicate("AverageObservedSegmentRating", train, ["user_attr", "model_attr"], observations_dir)
     _make_predicate("AveragePredictedSegmentRating", full_data, ["user_attr", "model_attr"], targets_dir)
     _make_predicate("AverageItemRatingByUG", test, ["user_attr", "item_id"], targets_dir)
-    # Diagnostic
     make_blocking_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
     make_blocking_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
-    # Other average priors
+    # ---- AVERAGE RATING PRIORS ----
     _make_average_rating_predicate('AverageItemRating', train, 'item_id', observations_dir)
     _make_average_rating_predicate('AverageUserRating', train, 'user_id', observations_dir)
     _make_average_rating_predicate('AverageBrandRating', train, 'brand', observations_dir)
-    #TODO: Create matrix factorization priors
-    _make_user_and_item_similarities(train, observations_dir, **similarity_settings)
+    # ---- SIMILARITIES ----
+    make_cosine_similarities(train, observations_dir, **similarity_settings)
     # Ratings in the train/test split
     _make_predicate('Rating', train, ['user_id', 'item_id', 'rating'], observations_dir)
     #Targets
@@ -247,7 +246,7 @@ def _make_average_rating_predicate(predicate_name, data, groupby, output_dir):
     _write_predicate(predicate_name, mean, output_dir)
 
 
-def _make_user_and_item_similarities(data, output_dir,
+def make_cosine_similarities(data, output_dir,
                                      user_required_rating_count,
                                      user_threshold,
                                      item_threshold):
