@@ -108,6 +108,7 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
         add_similarities(model)
     if "user_parity_fairness" in ruleset:
         _prepare_segment_average_predicates(model)
+        _prepare_segment_item_predicates(model)
         # exit()
         # add_user_parity_fairness(model)
     return model
@@ -161,7 +162,7 @@ def add_mf_prior(model):
 
 def _prepare_segment_average_predicates(model):
     model.add_predicate("TargetSegmentAvg", size=2, closed=False)
-    model.add_predicate("ItemSum", size=3, closed=False)
+    model.add_predicate("ItemSum", size=2, closed=False)
     UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
     ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
     Target = model.load_eval_observations("Target", ["user_id", "item_id"])
@@ -173,29 +174,43 @@ def _prepare_segment_average_predicates(model):
                              .merge(ItemGroup.query("model_attr == @ig"), on="item_id")
                       )
             segment_size = len(segment)
-            rule = f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}"
-            print(rule)
             model.add_rule(
-                f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}",
+                f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}",
                 weighted=False
             )
-            rule =  f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}"
-            print(rule)
             model.add_rule(
-                f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}",
+                f"ItemSum(+I, '{ug}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}",
                 weighted=False
             )
 
 
-def _prepare_user_rating_averages(model):
-    model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
-    model.add_predicate("AverageItemRatingByUG", closed=False, size=2)
+
+
+
+
+
+
+def _prepare_segment_item_predicates(model):
+    model.add_predicate("TargetSegmentItemAvg", closed=False, size=2)
+    model.add_predicate("ItemAvgByUG", closed=False, size=2)
     model.add_rule(
-        "Rating(+U, I) / |U| = AverageItemRatingByUG(UG, I) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=False
+        "Rating(+U, I) / |U| = ItemAvgByUG(I, UG) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=False
     )
     model.add_rule(
-        "AverageItemRatingByUG(UG, +I) / |I| = AveragePredictedSegmentRating(UG, IG) . {I: ItemGroup(I, IG)}", weighted=False
+        "ItemAvgByUG(+I, UG) / |I| = TargetSegmentItemAvg(UG, IG) . {I: ItemGroup(I, IG)}", weighted=False
     )
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def add_user_parity_fairness(model):
