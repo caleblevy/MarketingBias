@@ -39,23 +39,23 @@ ADDITIONAL_CLI_OPTIONS = [
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
 MODELS = {
-    # "baseline": set(),
-    # "prior": {
-    #     "rating_priors"
-    # },
-    # "similarity": {
-    #     "rating_priors",
-    #     "similarities"
-    # },
-    # "mf_prior": {
-    #     "rating_priors",
-    #     "matrix_factorization_prior"
-    # },
-    # "mf_prior_similarity": {
-    #     "rating_priors",
-    #     "matrix_factorization_prior",
-    #     "similarities"
-    # }
+    "baseline": set(),
+    "prior": {
+        "rating_priors"
+    },
+    "similarity": {
+        "rating_priors",
+        "similarities"
+    },
+    "mf_prior": {
+        "rating_priors",
+        "matrix_factorization_prior"
+    },
+    "mf_prior_similarity": {
+        "rating_priors",
+        "matrix_factorization_prior",
+        "similarities"
+    }
     "user_parity_fairness": {
         "rating_priors",
         "similarities",
@@ -162,7 +162,7 @@ def add_mf_prior(model):
 
 def _prepare_segment_average_predicates(model):
     model.add_predicate("TargetSegmentAvg", size=2, closed=False)
-    model.add_predicate("ItemSum", size=2, closed=False)
+    model.add_predicate("ItemSum", size=3, closed=False)
     UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
     ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
     Target = model.load_eval_observations("Target", ["user_id", "item_id"])
@@ -172,14 +172,23 @@ def _prepare_segment_average_predicates(model):
         for ig in item_groups:
             segment = (Target.merge(UserGroup.query("user_attr == @ug"), on="user_id")
                              .merge(ItemGroup.query("model_attr == @ig"), on="item_id")
-                      )
+                      ).dropna()
             segment_size = len(segment)
+            rule1 = f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}"
+            rule2 = f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}"
+            #
+            print("----------")
+            print(ug, ig, segment_size)
+            print(rule1)
+            print(rule2)
+            print("----------")
+            #
             model.add_rule(
-                f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}",
+                rule1,
                 weighted=False
             )
             model.add_rule(
-                f"ItemSum(+I, '{ug}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}",
+                rule2,
                 weighted=False
             )
 
