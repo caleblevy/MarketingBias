@@ -39,23 +39,23 @@ ADDITIONAL_CLI_OPTIONS = [
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
 MODELS = {
-    "baseline": set(),
-    "prior": {
-        "rating_priors"
-    },
-    "similarity": {
-        "rating_priors",
-        "similarities"
-    },
-    "mf_prior": {
-        "rating_priors",
-        "matrix_factorization_prior"
-    },
-    "mf_prior_similarity": {
-        "rating_priors",
-        "matrix_factorization_prior",
-        "similarities"
-    }
+    # "baseline": set(),
+    # "prior": {
+    #     "rating_priors"
+    # },
+    # "similarity": {
+    #     "rating_priors",
+    #     "similarities"
+    # },
+    # "mf_prior": {
+    #     "rating_priors",
+    #     "matrix_factorization_prior"
+    # },
+    # "mf_prior_similarity": {
+    #     "rating_priors",
+    #     "matrix_factorization_prior",
+    #     "similarities"
+    # },
     "user_parity_fairness": {
         "rating_priors",
         "similarities",
@@ -92,6 +92,7 @@ def main():
                 eval_tokens["model"].append(model_name)
                 eval_tokens["split"].append(str(split))
                 evaluate(model, eval_tokens)
+                # return  # TODO: Remove this
     eval_df = pd.DataFrame(eval_tokens)
     print(eval_df)
     eval_df.to_csv("evaluation.csv", index=False)
@@ -162,64 +163,35 @@ def add_mf_prior(model):
 
 def _prepare_segment_average_predicates(model):
     model.add_predicate("TargetSegmentAvg", size=2, closed=False)
-    model.add_predicate("ItemSum", size=3, closed=False)
+    model.add_predicate("TargetRatingSegment", size=4, closed=False)
     UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
     ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
     Target = model.load_eval_observations("Target", ["user_id", "item_id"])
     user_groups = model.load_eval_observations("ValidUserGroup")["col1"].unique()
     item_groups = model.load_eval_observations("ValidItemGroup")["col1"].unique()
+    model.add_rule(
+        "Rating(U, I) = TargetRatingSegment(U, I, UG, IG) .", weighted=False
+    )
     for ug in user_groups:
         for ig in item_groups:
             segment = (Target.merge(UserGroup.query("user_attr == @ug"), on="user_id")
                              .merge(ItemGroup.query("model_attr == @ig"), on="item_id")
                       ).dropna()
             segment_size = len(segment)
-            rule1 = f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}"
-            rule2 = f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}"
-            #
-            print("----------")
-            print(ug, ig, segment_size)
-            print(rule1)
-            print(rule2)
-            print("----------")
-            #
             model.add_rule(
-                rule1,
-                weighted=False
+                f"TargetRatingSegment(+U, +I, '{ug}', '{ig}') / {segment_size} = TargetSegmentAvg('{ug}', '{ig}') .", weighted=False
             )
-            model.add_rule(
-                rule2,
-                weighted=False
-            )
-
-
-
-
-
-
 
 
 def _prepare_segment_item_predicates(model):
     model.add_predicate("TargetSegmentItemAvg", closed=False, size=2)
     model.add_predicate("ItemAvgByUG", closed=False, size=2)
     model.add_rule(
-        "Rating(+U, I) / |U| = ItemAvgByUG(I, UG) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=False
+        "Rating(+U, I) / |U| = ItemAvgByUG(I, UG) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=0
     )
     model.add_rule(
-        "ItemAvgByUG(+I, UG) / |I| = TargetSegmentItemAvg(UG, IG) . {I: ItemGroup(I, IG)}", weighted=False
+        "ItemAvgByUG(+I, UG) / |I| = TargetSegmentItemAvg(UG, IG) . {I: ItemGroup(I, IG)}", weighted=0
     )
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def add_user_parity_fairness(model):
@@ -228,12 +200,6 @@ def add_user_parity_fairness(model):
     model.add_rule(
         "10: AveragePredictedSegmentRating(UG1, IG1) = AveragePredictedSegmentRating(UG2, IG2)"
     )
-
-
-
-def _add_global_rating_averages(model):
-    model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
-    Target = model.load_eval_observations("Target", ["user_id", "item_id"]).iloc[:, :-1]
 
 
 if (__name__ == '__main__'):

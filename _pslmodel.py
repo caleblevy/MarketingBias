@@ -410,8 +410,8 @@ class Rule(_Rule):
 
         if (self._squared):
             text.append('^2')
-        # elif (not self._weighted):
-        #     text.append('.')
+        elif self._weighted is False:
+            text.append('.')
 
         return ' '.join(text)
 

@@ -19,7 +19,7 @@ DATASETS = [
 ]
 BASELINE_SPLIT = True
 COMPUTE_MF_RATINGS = False
-NUM_SPLITS = 0
+NUM_SPLITS = 1
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -215,7 +215,7 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     # segment by rating
     _make_average_rating_predicate("ObsSegmentAvg", train, ["user_attr", "model_attr"], observations_dir)
     _make_predicate("TargetSegmentAvg", test, ["user_attr", "model_attr"], targets_dir)
-    _make_predicate("ItemSum", test, ["item_id", "user_attr", "model_attr"], targets_dir)
+    _make_predicate("TargetRatingSegment", test, ["user_id", "item_id", "user_attr", "model_attr"], targets_dir)
     # segment by item
     make_segment_average_predicate_by("ObsSegmentItemAvg", train, "item_id", observations_dir)
     _make_predicate("TargetSegmentItemAvg", test, ["user_attr", "model_attr"], targets_dir)
