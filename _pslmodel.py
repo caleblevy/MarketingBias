@@ -205,7 +205,6 @@ class Model:
         ]
 
         for option in cli_options:
-            print(option)
             command.append(str(option))
 
         for (key, value) in psl_config.items():

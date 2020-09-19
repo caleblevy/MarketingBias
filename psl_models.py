@@ -110,6 +110,7 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
     if "user_parity_fairness" in ruleset:
         _prepare_segment_average_predicates(model)
         _prepare_segment_item_predicates(model)
+        _prepare_segment_user_predicates(model)
         # exit()
         # add_user_parity_fairness(model)
     return model
@@ -191,6 +192,17 @@ def _prepare_segment_item_predicates(model):
     )
     model.add_rule(
         "ItemAvgByUG(+I, UG) / |I| = TargetSegmentItemAvg(UG, IG) . {I: ItemGroup(I, IG)}", weighted=0
+    )
+
+
+def _prepare_segment_user_predicates(model):
+    model.add_predicate("TargetSegmentUserAvg", closed=False, size=2)
+    model.add_predicate("UserAvgByIG", closed=False, size=2)
+    model.add_rule(
+        "Rating(U, +I) / |I| = UserAvgByIG(U, IG) . {I: ItemGroup(I, IG) & Target(U, I)}", weighted=0
+    )
+    model.add_rule(
+        "UserAvgByIG(+U, IG) / |U| = TargetSegmentUserAvg(UG, IG) . {U: UserGroup(U, UG)}", weighted=0
     )
 
 
