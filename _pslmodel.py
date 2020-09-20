@@ -21,7 +21,7 @@ from pslpython.rule import Rule as _Rule
 class Model:
 
     # TODO: Decide whether to allow include jar file in github
-    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli-2.2.2.jar"
+    CLI_JAR_PATH = Path(__file__).parent.absolute() / "executables" / "psl-cli-2.3.0-SNAPSHOT.jar"
     TRUTH_COLUMN_NAME = 'truth'
     CLI_DELIM = "\t"
 
@@ -372,6 +372,9 @@ class Model:
         if partition != "targets":
             column_names += [truthiness_name]
         return pandas.read_csv(filename, sep='\t', names=column_names)
+
+
+# _Predicate.DEFAULT_ARG_TYPE = _Predicate.ArgType.UNIQUE_INT_ID
 
 
 class Predicate(_Predicate):

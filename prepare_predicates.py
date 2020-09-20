@@ -213,8 +213,8 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     make_blocking_predicate('UserGroup', full_data, ['user_id', 'user_attr'], observations_dir)
     make_blocking_predicate('ItemGroup', full_data, ['item_id', 'model_attr'], observations_dir)
     # segment by rating
-    _make_average_rating_predicate("ObsSegmentAvg", train, ["user_attr", "model_attr"], observations_dir)
-    _make_predicate("TargetSegmentAvg", test, ["user_attr", "model_attr"], targets_dir)
+    _make_average_rating_predicate("ObsSegmentRatingAvg", train, ["user_attr", "model_attr"], observations_dir)
+    _make_predicate("TargetSegmentRatingAvg", test, ["user_attr", "model_attr"], targets_dir)
     _make_predicate("TargetRatingSegment", test, ["user_id", "item_id", "user_attr", "model_attr"], targets_dir)
     # segment by item
     make_segment_average_predicate_by("ObsSegmentItemAvg", train, "item_id", observations_dir)
@@ -235,15 +235,13 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
 
 
 def make_segment_average_predicate_by(predicate_name, data, by, output_dir):
-    data = (data[["user_attr", "model_attr", by, "rating"]]
-                .dropna()
-                .groupby(["user_attr", "model_attr", by])
-                .mean("rating")
+    data = (data.groupby(["user_attr", "model_attr", by])["rating"]
+                .mean()
                 .reset_index()
                 .groupby(["user_attr", "model_attr"])
-                .mean("rating")
-                .reset_index()[["user_attr", "model_attr", "rating"]]
-            )
+                .mean()
+                .reset_index()
+           )
     _write_predicate(predicate_name, data, output_dir)
 
 

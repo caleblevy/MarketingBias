@@ -17,7 +17,7 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
+SPLITS = ["baseline_split", 0, 1]
 
 PRINT_JAVA_OUTPUT = True
 RUN_MODEL = True
@@ -33,11 +33,34 @@ ADDITIONAL_PSL_OPTIONS = {
 ADDITIONAL_CLI_OPTIONS = [
     '--postgres',
     '--int-ids',
-    '--groundrules', 'throwaway/ground.txt'
+    # '--groundrules', 'throwaway/ground.txt'
     # '--satisfaction'
 ]
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
+
+# Abbrevs = {
+#   Avg: "Average Rating Prior",
+#   MF: "Matrix Factorization",
+#   Sim: "Similarity",
+#   Parity: "Rating Parity Fairness",
+#   Value: "Rating Value Fairness"
+# }
+BASE_MODELS = [
+    ["Avg"],
+    ["Avg", "Sim"],
+    ["MF"],
+    ["Avg", "MF", "Sim"],
+]
+
+
+FAIRNESS_RULES = [
+    ["Parity"],
+    ["Value"],
+    ["Parity", "Value"]
+]
+
+
 MODELS = {
     # "baseline": set(),
     # "prior": {
@@ -62,6 +85,7 @@ MODELS = {
         "user_parity_fairness"
     }
 }
+
 
 
 # TODO: deal with weight learning (separate data adding)
@@ -92,7 +116,7 @@ def main():
                 eval_tokens["model"].append(model_name)
                 eval_tokens["split"].append(str(split))
                 evaluate(model, eval_tokens)
-                # return  # TODO: Remove this
+                return  # TODO: Remove this
     eval_df = pd.DataFrame(eval_tokens)
     print(eval_df)
     eval_df.to_csv("evaluation.csv", index=False)
@@ -103,16 +127,14 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
     add_baselines(model)
     if "rating_priors" in ruleset:
         add_rating_priors(model)
-    if "matrix_factorization_prior" in ruleset:
-        add_mf_prior(model)
+    if "matrix_factorization" in ruleset:
+        add_mf_priors(model)
     if "similarities" in ruleset:
         add_similarities(model)
     if "user_parity_fairness" in ruleset:
-        _prepare_segment_average_predicates(model)
-        _prepare_segment_item_predicates(model)
-        _prepare_segment_user_predicates(model)
-        # exit()
-        # add_user_parity_fairness(model)
+        _prepare_rating_fairness(model)
+        _prepare_user_fairness(model)
+        _prepare_item_fairness(model)
     return model
 
 
@@ -162,8 +184,11 @@ def add_mf_prior(model):
     model.add_rule("10: Rating(U, I) -> MFRating(U, I) ^2")
 
 
-def _prepare_segment_average_predicates(model):
-    model.add_predicate("TargetSegmentAvg", size=2, closed=False)
+# ---- RATING FAIRNESS ----
+
+
+def _prepare_rating_fairness(model):
+    model.add_predicate("TargetSegmentRatingAvg", size=2, closed=False)
     model.add_predicate("TargetRatingSegment", size=4, closed=False)
     UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
     ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
@@ -180,11 +205,28 @@ def _prepare_segment_average_predicates(model):
                       ).dropna()
             segment_size = len(segment)
             model.add_rule(
-                f"TargetRatingSegment(+U, +I, '{ug}', '{ig}') / {segment_size} = TargetSegmentAvg('{ug}', '{ig}') .", weighted=False
+                f"TargetRatingSegment(+U, +I, '{ug}', '{ig}') / {segment_size} = TargetSegmentRatingAvg('{ug}', '{ig}') .", weighted=False
             )
 
 
-def _prepare_segment_item_predicates(model):
+def add_segment_rating_parity(model):
+    # TODO: Write out unique segments in a for-loop, since arithmetic rules don't support != predicate
+    model.add_rule(
+        "10: TargetSegmentAvg(UG1, IG1) = TargetSegmentAvg(UG2, IG2)"
+    )
+
+
+def add_segment_rating_value_fairness(model):
+    model.add_predicate("ObsSegmentRatingAvg", closed=False, size=2)
+    model.add_rule(
+        "10: TargetSegmentRatingAvg(UG1, IG1) - ObsSegmentRatingAvg(UG1, IG1) = TargetSegmentRatingAvg(UG2, IG2) - ObsSegmentRatingAvg(UG2, IG2)"
+    )
+
+
+# ---- ITEM FAIRNESS ----
+
+
+def _prepare_item_fairness(model):
     model.add_predicate("TargetSegmentItemAvg", closed=False, size=2)
     model.add_predicate("ItemAvgByUG", closed=False, size=2)
     model.add_rule(
@@ -195,7 +237,23 @@ def _prepare_segment_item_predicates(model):
     )
 
 
-def _prepare_segment_user_predicates(model):
+def add_segment_item_parity(model):
+    model.add_rule(
+        "10: TargetSegmentItemAvg(UG1, IG1) = TargetSegmentItemAvg(UG2, IG2)"
+    )
+
+
+def add_segment_item_value_fairness(model):
+    model.add_predicate("ObsSegmentItemAvg", closed=False, size=2)
+    model.add_rule(
+        "10: TargetSegmentItemAvg(UG1, IG1) - ObsSegmentItemAvg(UG1, IG1) = TargetSegmentItemAvg(UG2, IG2) - ObsSegmentItemAvg(UG2, IG2)"
+    )
+
+
+# ---- USER FAIRNESS ----
+
+
+def _prepare_user_fairness(model):
     model.add_predicate("TargetSegmentUserAvg", closed=False, size=2)
     model.add_predicate("UserAvgByIG", closed=False, size=2)
     model.add_rule(
@@ -206,12 +264,18 @@ def _prepare_segment_user_predicates(model):
     )
 
 
-def add_user_parity_fairness(model):
-    _prepare_user_rating_averages(model)
-    # TODO: Write out unique segments in a for-loop, since arithmetic rules don't support != predicate
+def add_segment_user_parity(model):
     model.add_rule(
-        "10: AveragePredictedSegmentRating(UG1, IG1) = AveragePredictedSegmentRating(UG2, IG2)"
+        "10: TargetSegmentUserAvg(UG1, IG1) = TargetSegmentUserAvg(UG2, IG2)"
     )
+
+
+def add_segment_user_value_fairness(model):
+    model.load_predicate("ObsSegmentUserAvg", closed=False, size=2)
+    model.add_rule(
+        "10: TargetSegmentUserAvg(UG1, IG1) - ObsSegmentUserAvg(UG1, IG1) = TargetSegmentUserAvg(UG2, IG2) - ObsSegmentUserAvg(UG2, IG2)"
+    )
+
 
 
 if (__name__ == '__main__'):
