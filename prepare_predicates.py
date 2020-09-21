@@ -6,20 +6,21 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import pairwise_distances
+from sklearn.model_selection import KFold
 
 
 sys.path.insert(0, 'matrix_factorization')
 from main import mf_rating
-from make_mf_into_predicate import make_mf_into_predicate
+#from make_mf_into_predicate import make_mf_into_predicate
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = [
     "modcloth",
     "electronics"
 ]
-BASELINE_SPLIT = True
+BASELINE_SPLIT = False
 COMPUTE_MF_RATINGS = False
-NUM_SPLITS = 0
+NUM_SPLITS = 5
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -81,15 +82,49 @@ def main():
             json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
         if BASELINE_SPLIT:
             create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
-            make_mf_into_predicate(dataset)
-        for split in range(NUM_SPLITS):
-            # TODO: Create validation, look into cross-validation
-            # TODO: Select proper random seeds
-            create_random_split(data, predicate_dir, split,
-                         eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
-                         learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
-                         similarity_settings=similarity_settings,
-                         compute_mf_ratings=COMPUTE_MF_RATINGS)
+            #make_mf_into_predicate(dataset)
+
+        # K-Fold
+        kf = KFold(n_splits=NUM_SPLITS)
+        for (train_index, test_index), split in zip(kf.split(data), range(kf.get_n_splits())):
+            split_dir = predicate_dir / str(split)
+
+            eval_data = create_k_fold_split(data, train_index, test_index, 1/(1+LEARN_TRAIN_TEST_RATIO))
+            observations_eval = eval_data.query('split == 0 | split == 1')
+            test_eval = eval_data.query('split == 2')
+
+            learn_data = create_weight_learning_split(observations_eval, 1/(1+LEARN_TRAIN_TEST_RATIO))
+            observations_learn = learn_data.query('split == 0 | split == 1')
+            test_learn = learn_data.query('split == 2')
+
+            create_predicates(data, observations_eval, test_eval, split_dir / "eval", similarity_settings, mf=COMPUTE_MF_RATINGS)
+            create_predicates(learn_data, observations_learn, test_learn, split_dir / "learn", similarity_settings)
+
+def create_k_fold_split(data, train_index, test_index, learn_test_size):
+    train = data.iloc[train_index]
+    train, validation = train_test_split(train, test_size=learn_test_size, random_state=0)
+
+    train = train.assign(split=0)
+    validation = validation.assign(split=1)
+    test = data.iloc[test_index].assign(split=2)
+
+    observations = train.append(validation)
+    data = observations.append(test)
+
+    return data
+
+def create_weight_learning_split(data, validation_size):
+    train = data.query('split == 0')
+    test = data.query('split == 1').assign(split=2)
+
+    train, validation = train_test_split(train, test_size=validation_size, random_state=0)
+    train = train.assign(split=0)
+    validation = validation.assign(split=1)
+
+    observations = train.append(validation)
+    data = observations.append(test)
+
+    return data
 
 
 def create_baseline_split(data, predicate_dir, similarity_settings):
