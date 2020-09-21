@@ -374,7 +374,7 @@ class Model:
         return pandas.read_csv(filename, sep='\t', names=column_names)
 
 
-# _Predicate.DEFAULT_ARG_TYPE = _Predicate.ArgType.UNIQUE_INT_ID
+_Predicate.DEFAULT_ARG_TYPE = _Predicate.ArgType.UNIQUE_INT_ID
 
 
 class Predicate(_Predicate):

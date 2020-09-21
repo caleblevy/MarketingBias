@@ -14,7 +14,7 @@ from evaluation import evaluate
 DATA_DIR = Path(__file__).parent.absolute() / "datasets"
 RESULT_DIR = Path(__file__).parent.absolute() / "results"
 DATASETS = [
-    "modcloth",
+    # "modcloth",
     "electronics"
 ]
 SPLITS = ["baseline_split", 0, 1]
