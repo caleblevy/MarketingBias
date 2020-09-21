@@ -14,7 +14,7 @@ from evaluation import evaluate
 DATA_DIR = Path(__file__).parent.absolute() / "datasets"
 RESULT_DIR = Path(__file__).parent.absolute() / "results"
 DATASETS = [
-    # "modcloth",
+    "modcloth",
     "electronics"
 ]
 SPLITS = ["baseline_split", 0, 1]
@@ -35,6 +35,10 @@ ADDITIONAL_CLI_OPTIONS = [
     '--int-ids',
     # '--groundrules', 'throwaway/ground.txt'
     # '--satisfaction'
+]
+
+ADDITIONAL_JAVA_OPTIONS = [
+    "-Xmx8G",
 ]
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
@@ -111,6 +115,7 @@ def main():
                 if RUN_MODEL:
                     results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
                                           psl_config=ADDITIONAL_PSL_OPTIONS,
+                                          jvm_options=ADDITIONAL_JAVA_OPTIONS,
                                           print_java_output=PRINT_JAVA_OUTPUT)
                 eval_tokens["dataset"].append(dataset)
                 eval_tokens["model"].append(model_name)
@@ -133,8 +138,8 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
         add_similarities(model)
     if "user_parity_fairness" in ruleset:
         _prepare_rating_fairness(model)
-        _prepare_user_fairness(model)
-        _prepare_item_fairness(model)
+        # _prepare_user_fairness(model)
+        # _prepare_item_fairness(model)
     return model
 
 
