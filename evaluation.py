@@ -16,14 +16,17 @@ def evaluate(model, eval_tokens):
     MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"])
     # print(output_dir)
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
-    F1, F2, P = f_stat(data, model)
     AUC = _auc(data['rating_truth'], data['rating_inferred'], 4)
+    F_KYLE, F_A_STR, P_A_STR, F_A_NOSTR, P_A_NOSTR = f_stat(data, model)
     eval_tokens["MAE"].append(MAE)
     eval_tokens["MSE"].append(MSE)
-    eval_tokens["F-stat"].append(F1)
     eval_tokens["AUC"].append(AUC)
-    eval_tokens["F-stat (statsmodels)"].append(F2)
-    eval_tokens["p (statsmodels)"].append(P)
+    eval_tokens["F-stat (Kyle)"].append(F_KYLE)
+    eval_tokens["F-stat (statsmodels - str)"].append(F_A_STR)
+    eval_tokens["p (statsmodels - str)"].append(P_A_STR)
+    eval_tokens["F-stat (statsmodels - no str)"].append(F_A_NOSTR)
+    eval_tokens["p (statsmodels - no str)"].append(P_A_NOSTR)
+    print(F_KYLE, F_A_STR, P_A_STR, F_A_NOSTR, P_A_NOSTR)
 
 
 def _auc(truth, inferred, threshold):
@@ -42,7 +45,6 @@ def f_stat(data, model):
     inferred_ratings = np.array(data["rating_inferred"])
     errors = true_ratings - inferred_ratings
     data['error'] = errors
-    data = data.dropna()
     user_attrs = data["user_attr"].dropna().unique()
     model_attrs = data["model_attr"].dropna().unique()
     M = len(user_attrs)
@@ -62,7 +64,9 @@ def f_stat(data, model):
                 u_market_segment += (error - market_segment_average_error) ** 2
 
             U += u_market_segment
-    f1 = (V / (M * N - 1)) / (U / (data.shape[0] - (M * N)))
-    f2, p2 = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
-    # print(f1, f2, p2)
-    return f1, f2, p2
+    f_kyle = (V / (M * N - 1)) / (U / (data.shape[0] - (M * N)))
+    f_a_nostr, p_a_nostr = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
+    data["user_attr"] = data["user_attr"].astype(str)
+    data["model_attr"] = data["model_attr"].astype(str)
+    f_a_str, p_a_str = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
+    return f_kyle, f_a_str, p_a_str, f_a_nostr, p_a_nostr

@@ -76,9 +76,11 @@ def main():
         "MSE": [],
         "MAE": [],
         "AUC": [],
-        "F-stat": [],
-        "F-stat (statsmodels)": [],
-        "p (statsmodels)": []
+        "F-stat (Kyle)": [],
+        "F-stat (statsmodels - str)": [],
+        "p (statsmodels - str)": [],
+        "F-stat (statsmodels - no str)": [],
+        "p (statsmodels - no str)": []
     }
     for dataset in DATASETS:
         for split in SPLITS:
