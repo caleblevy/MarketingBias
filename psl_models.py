@@ -74,7 +74,8 @@ def main():
         "split": [],
         "MAE": [],
         "MSE": [],
-        "F-stat": []
+        "F-stat": [],
+        "AUC": []
     }
     for dataset in DATASETS:
         for split in SPLITS:
