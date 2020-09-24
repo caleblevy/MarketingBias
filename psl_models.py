@@ -52,6 +52,7 @@ ADDITIONAL_JAVA_OPTIONS = [
 #   Value: "Rating Value Fairness"
 # }
 BASE_RULESETS = [
+    ["MFBaseline"],
     ["Avg"],
     ["Avg", "Sim"],
     ["Avg", "Sim", "MF"],
@@ -87,7 +88,9 @@ def main():
                 model_name = ''.join(base_rules)
                 if fairness_rules:
                     model_name += '_' + ''.join(fairness_rules)
-                if split != 'baseline_split' and 'MF' in model_rule_names:
+                if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names):
+                    continue
+                if "MFBaseline" in model_rule_names and fairness_rules:
                     continue
                 print(dataset, model_name, split)
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
@@ -123,6 +126,8 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
             add_segment_rating_parity(model)
         if "Errparity" in ruleset:
             add_segment_rating_value_fairness(model)
+    if "MFBaseline" in ruleset:
+        mf_baseline(model)
     return model
 
 
@@ -170,6 +175,11 @@ def add_mf_prior(model):
     model.add_predicate("MFRating", size=2, closed=True)
     model.add_rule("10: MFRating(U, I) -> Rating(U, I) ^2")
     model.add_rule("10: Rating(U, I) -> MFRating(U, I) ^2")
+
+
+def mf_baseline(model):
+    model.add_predicate("MFRating", size=2, closed=True)
+    model.add_rule("MFRating(U, I) = Rating(U, I) .", weighted=False)
 
 
 # ---- RATING FAIRNESS ----
