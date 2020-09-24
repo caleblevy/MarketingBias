@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from itertools import product
 from pathlib import Path
 import os
 
@@ -17,7 +18,7 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
+SPLITS = ["baseline_split", 0]
 
 PRINT_JAVA_OUTPUT = True
 RUN_MODEL = True
@@ -33,35 +34,36 @@ ADDITIONAL_PSL_OPTIONS = {
 ADDITIONAL_CLI_OPTIONS = [
     '--postgres',
     '--int-ids',
-    '--groundrules', 'throwaway/ground.txt'
+    # '--groundrules', 'throwaway/ground.txt'
     # '--satisfaction'
 ]
 
+ADDITIONAL_JAVA_OPTIONS = [
+    "-Xmx8G",
+]
+
 # TODO: If there are too many shared models, we can make "shared models" global variable
-MODELS = {
-    # "baseline": set(),
-    # "prior": {
-    #     "rating_priors"
-    # },
-    # "similarity": {
-    #     "rating_priors",
-    #     "similarities"
-    # },
-    # "mf_prior": {
-    #     "rating_priors",
-    #     "matrix_factorization_prior"
-    # },
-    # "mf_prior_similarity": {
-    #     "rating_priors",
-    #     "matrix_factorization_prior",
-    #     "similarities"
-    # }
-    "user_parity_fairness": {
-        "rating_priors",
-        "similarities",
-        "user_parity_fairness"
-    }
-}
+
+# Abbrevs = {
+#   Avg: "Average Rating Prior",
+#   MF: "Matrix Factorization",
+#   Sim: "Similarity",
+#   Parity: "Rating Parity Fairness",
+#   Value: "Rating Value Fairness"
+# }
+BASE_RULESETS = [
+    ["Avg"],
+    ["Avg", "Sim"],
+    # ["Avg", "Sim", "MF"],
+]
+
+
+FAIRNESS_RULESETS = [
+    [],
+    ["Valparity"],
+    ["Errparity"],
+    ["Valparity", "Errparity"]
+]
 
 
 # TODO: deal with weight learning (separate data adding)
@@ -75,41 +77,51 @@ def main():
         "F-stat": []
     }
     for dataset in DATASETS:
-        eval_tokens["dataset"]
         for split in SPLITS:
             predicate_dir = DATA_DIR / dataset / "predicates" / str(split)
-            for model_name, ruleset in MODELS.items():
-                print(dataset, model_name, split)
-                if split != 'baseline_split' and 'mf' in model_name:
+            for base_rules, fairness_rules in product(BASE_RULESETS, FAIRNESS_RULESETS):
+                model_rule_names = []
+                model_rule_names.extend(base_rules)
+                model_rule_names.extend(fairness_rules)
+                model_name = ''.join(base_rules)
+                if fairness_rules:
+                    model_name += '_' + ''.join(fairness_rules)
+                if split != 'baseline_split' and 'MF' in model_rule_names:
                     continue
+                print(dataset, model_name, split)
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
-                model = make_model(model_name, predicate_dir, output_dir, ruleset)
+                model = make_model(model_name, predicate_dir, output_dir, model_rule_names)
                 if RUN_MODEL:
-                    results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
-                                          psl_config=ADDITIONAL_PSL_OPTIONS,
-                                          print_java_output=PRINT_JAVA_OUTPUT)
+                    if OVERWRITE_OLD_DATA or not output_dir.is_dir():
+                        results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
+                                              psl_config=ADDITIONAL_PSL_OPTIONS,
+                                              jvm_options=ADDITIONAL_JAVA_OPTIONS,
+                                              print_java_output=PRINT_JAVA_OUTPUT)
                 eval_tokens["dataset"].append(dataset)
                 eval_tokens["model"].append(model_name)
                 eval_tokens["split"].append(str(split))
                 evaluate(model, eval_tokens)
+                # return  # TODO: Remove this
     eval_df = pd.DataFrame(eval_tokens)
     print(eval_df)
-    eval_df.to_csv("evaluation.csv", index=False)
+    eval_df.to_csv("throwaway/evaluation.csv", index=False)
 
 
 def make_model(model_name, predicate_dir, output_dir, ruleset):
     model = Model(model_name, predicate_dir, output_dir)
     add_baselines(model)
-    if "rating_priors" in ruleset:
+    if "Avg" in ruleset:
         add_rating_priors(model)
-    if "matrix_factorization_prior" in ruleset:
-        add_mf_prior(model)
-    if "similarities" in ruleset:
+    if "Sim" in ruleset:
         add_similarities(model)
-    if "user_parity_fairness" in ruleset:
-        _prepare_segment_average_predicates(model)
-        # exit()
-        # add_user_parity_fairness(model)
+    if "MF" in ruleset:
+        add_mf_priors(model)
+    if "Valparity" in ruleset or "Errparity" in ruleset:
+        _prepare_rating_fairness(model)
+        if "Valparity" in ruleset:
+            add_segment_rating_parity(model)
+        if "Errparity" in ruleset:
+            add_segment_rating_value_fairness(model)
     return model
 
 
@@ -159,57 +171,98 @@ def add_mf_prior(model):
     model.add_rule("10: Rating(U, I) -> MFRating(U, I) ^2")
 
 
-def _prepare_segment_average_predicates(model):
-    model.add_predicate("TargetSegmentAvg", size=2, closed=False)
-    model.add_predicate("ItemSum", size=3, closed=False)
+# ---- RATING FAIRNESS ----
+
+
+def _prepare_rating_fairness(model):
+    model.add_predicate("TargetSegmentRatingAvg", size=2, closed=False)
+    model.add_predicate("TargetRatingSegment", size=4, closed=False)
     UserGroup = model.load_eval_observations("UserGroup", ["user_id", "user_attr"]).iloc[:, :-1]
     ItemGroup = model.load_eval_observations("ItemGroup", ["item_id", "model_attr"]).iloc[:, :-1]
     Target = model.load_eval_observations("Target", ["user_id", "item_id"])
     user_groups = model.load_eval_observations("ValidUserGroup")["col1"].unique()
     item_groups = model.load_eval_observations("ValidItemGroup")["col1"].unique()
+    model.add_rule(
+        "Rating(U, I) = TargetRatingSegment(U, I, UG, IG) .", weighted=False
+    )
     for ug in user_groups:
         for ig in item_groups:
             segment = (Target.merge(UserGroup.query("user_attr == @ug"), on="user_id")
                              .merge(ItemGroup.query("model_attr == @ig"), on="item_id")
-                      )
+                      ).dropna()
             segment_size = len(segment)
-            rule = f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}"
-            print(rule)
             model.add_rule(
-                f"Rating(+U, I) / {segment_size} = ItemSum(I, '{ug}', '{ig}') . {{U: UserGroup(U, '{ug}') & Target(U, I)}}",
-                weighted=False
-            )
-            rule =  f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}"
-            print(rule)
-            model.add_rule(
-                f"ItemSum(+I, '{ug}', '{ig}') = TargetSegmentAvg('{ug}', '{ig}') . {{I: ItemGroup(I, '{ig}')}}",
-                weighted=False
+                f"TargetRatingSegment(+U, +I, '{ug}', '{ig}') / {segment_size} = TargetSegmentRatingAvg('{ug}', '{ig}') .", weighted=False
             )
 
 
-def _prepare_user_rating_averages(model):
-    model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
-    model.add_predicate("AverageItemRatingByUG", closed=False, size=2)
-    model.add_rule(
-        "Rating(+U, I) / |U| = AverageItemRatingByUG(UG, I) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=False
-    )
-    model.add_rule(
-        "AverageItemRatingByUG(UG, +I) / |I| = AveragePredictedSegmentRating(UG, IG) . {I: ItemGroup(I, IG)}", weighted=False
-    )
-
-
-def add_user_parity_fairness(model):
-    _prepare_user_rating_averages(model)
+def add_segment_rating_parity(model):
     # TODO: Write out unique segments in a for-loop, since arithmetic rules don't support != predicate
     model.add_rule(
-        "10: AveragePredictedSegmentRating(UG1, IG1) = AveragePredictedSegmentRating(UG2, IG2)"
+        "10: TargetSegmentRatingAvg(UG1, IG1) = TargetSegmentRatingAvg(UG2, IG2)"
     )
 
 
+def add_segment_rating_value_fairness(model):
+    model.add_predicate("ObsSegmentRatingAvg", closed=True, size=2)
+    model.add_rule(
+        "10: TargetSegmentRatingAvg(UG1, IG1) - ObsSegmentRatingAvg(UG1, IG1) = TargetSegmentRatingAvg(UG2, IG2) - ObsSegmentRatingAvg(UG2, IG2)"
+    )
 
-def _add_global_rating_averages(model):
-    model.add_predicate("AveragePredictedSegmentRating", closed=False, size=2)
-    Target = model.load_eval_observations("Target", ["user_id", "item_id"]).iloc[:, :-1]
+
+# ---- ITEM FAIRNESS ----
+
+
+def _prepare_item_fairness(model):
+    model.add_predicate("TargetSegmentItemAvg", closed=False, size=2)
+    model.add_predicate("ItemAvgByUG", closed=False, size=2)
+    model.add_rule(
+        "Rating(+U, I) / |U| = ItemAvgByUG(I, UG) . {U: UserGroup(U, UG) & Target(U, I)}", weighted=0
+    )
+    model.add_rule(
+        "ItemAvgByUG(+I, UG) / |I| = TargetSegmentItemAvg(UG, IG) . {I: ItemGroup(I, IG)}", weighted=0
+    )
+
+
+def add_segment_item_parity(model):
+    model.add_rule(
+        "10: TargetSegmentItemAvg(UG1, IG1) = TargetSegmentItemAvg(UG2, IG2)"
+    )
+
+
+def add_segment_item_value_fairness(model):
+    model.add_predicate("ObsSegmentItemAvg", closed=False, size=2)
+    model.add_rule(
+        "10: TargetSegmentItemAvg(UG1, IG1) - ObsSegmentItemAvg(UG1, IG1) = TargetSegmentItemAvg(UG2, IG2) - ObsSegmentItemAvg(UG2, IG2)"
+    )
+
+
+# ---- USER FAIRNESS ----
+
+
+def _prepare_user_fairness(model):
+    model.add_predicate("TargetSegmentUserAvg", closed=False, size=2)
+    model.add_predicate("UserAvgByIG", closed=False, size=2)
+    model.add_rule(
+        "Rating(U, +I) / |I| = UserAvgByIG(U, IG) . {I: ItemGroup(I, IG) & Target(U, I)}", weighted=0
+    )
+    model.add_rule(
+        "UserAvgByIG(+U, IG) / |U| = TargetSegmentUserAvg(UG, IG) . {U: UserGroup(U, UG)}", weighted=0
+    )
+
+
+def add_segment_user_parity(model):
+    model.add_rule(
+        "10: TargetSegmentUserAvg(UG1, IG1) = TargetSegmentUserAvg(UG2, IG2)"
+    )
+
+
+def add_segment_user_value_fairness(model):
+    model.load_predicate("ObsSegmentUserAvg", closed=False, size=2)
+    model.add_rule(
+        "10: TargetSegmentUserAvg(UG1, IG1) - ObsSegmentUserAvg(UG1, IG1) = TargetSegmentUserAvg(UG2, IG2) - ObsSegmentUserAvg(UG2, IG2)"
+    )
+
 
 
 if (__name__ == '__main__'):
