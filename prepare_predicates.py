@@ -10,8 +10,8 @@ from sklearn.model_selection import KFold
 
 
 sys.path.insert(0, 'matrix_factorization')
-from main import mf_rating
-from make_mf_into_predicate import make_mf_into_predicate
+#from main import mf_rating
+#from make_mf_into_predicate import make_mf_into_predicate
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = [
@@ -20,7 +20,7 @@ DATASETS = [
 ]
 BASELINE_SPLIT = False
 COMPUTE_MF_RATINGS = False
-NUM_SPLITS = 1
+NUM_SPLITS = 2
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -82,16 +82,19 @@ def main():
             json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
         if BASELINE_SPLIT:
             create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
-            make_mf_into_predicate(dataset)
+            #make_mf_into_predicate(dataset)
 
         # K-Fold
         kf = KFold(n_splits=NUM_SPLITS)
         for (train_index, test_index), split in zip(kf.split(data), range(kf.get_n_splits())):
             split_dir = predicate_dir / str(split)
+            split_dir.mkdir(exist_ok=True)
 
             eval_data = create_k_fold_split(data, train_index, test_index, 1/(1+LEARN_TRAIN_TEST_RATIO))
             observations_eval = eval_data.query('split == 0 | split == 1')
             test_eval = eval_data.query('split == 2')
+
+            print(test_eval.shape)
 
             learn_data = create_weight_learning_split(observations_eval, 1/(1+LEARN_TRAIN_TEST_RATIO))
             observations_learn = learn_data.query('split == 0 | split == 1')
@@ -194,6 +197,7 @@ def _substitute_column(data, column_name, attr_map):
 
 
 def create_predicates(full_data, train, test, output_dir, similarity_settings, mf=False):
+    print(output_dir)
     output_dir.mkdir(exist_ok=True)
     observations_dir = output_dir / "observations"
     targets_dir = output_dir / "targets"
@@ -240,7 +244,8 @@ def create_predicates(full_data, train, test, output_dir, similarity_settings, m
     _make_predicate('Rating', test, ['user_id', 'item_id', 'rating'], truth_dir)
     # ---- MATRIX FACTORIZATION ----
     if mf:
-        _make_mf_predicate(full_data, observations_dir)
+        pass
+        #_make_mf_predicate(full_data, observations_dir)
 
 
 def make_segment_average_predicate_by(predicate_name, data, by, output_dir):
