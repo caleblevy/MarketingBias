@@ -21,7 +21,7 @@ DATASETS = [
 SPLITS = ["baseline_split", 0]
 
 PRINT_JAVA_OUTPUT = True
-RUN_MODEL = True
+RUN_MODEL = False
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
 OVERWRITE_OLD_DATA = False
@@ -74,7 +74,8 @@ def main():
         "split": [],
         "MAE": [],
         "MSE": [],
-        "F-stat": []
+        "F-stat": [],
+        "AUC": []
     }
     for dataset in DATASETS:
         for split in SPLITS:

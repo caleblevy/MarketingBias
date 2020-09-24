@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, auc, roc_curve
 import statsmodels as sm
 import statsmodels.api as sm
 from statsmodels.formula.api import ols
@@ -17,9 +17,12 @@ def evaluate(model, eval_tokens):
     # print(output_dir)
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
     F = f_stat(data, model)
+    fpr, tpr, thresholds = roc_curve(data["rating_truth"], data["rating_inferred"], pos_label = 2)
+    AUC = auc(fpr, tpr)
     eval_tokens["MAE"].append(MAE)
     eval_tokens["MSE"].append(MSE)
     eval_tokens["F-stat"].append(F)
+    eval_tokens["AUC"].append(AUC)
 
 
 def f_stat(data, model):
