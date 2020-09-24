@@ -94,8 +94,6 @@ def main():
             observations_eval = eval_data.query('split == 0 | split == 1')
             test_eval = eval_data.query('split == 2')
 
-            print(test_eval.shape)
-
             learn_data = create_weight_learning_split(observations_eval, 1/(1+LEARN_TRAIN_TEST_RATIO))
             observations_learn = learn_data.query('split == 0 | split == 1')
             test_learn = learn_data.query('split == 2')
@@ -197,7 +195,6 @@ def _substitute_column(data, column_name, attr_map):
 
 
 def create_predicates(full_data, train, test, output_dir, similarity_settings, mf=False):
-    print(output_dir)
     output_dir.mkdir(exist_ok=True)
     observations_dir = output_dir / "observations"
     targets_dir = output_dir / "targets"
