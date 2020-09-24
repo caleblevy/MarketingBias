@@ -73,10 +73,12 @@ def main():
         "dataset": [],
         "model": [],
         "split": [],
-        "MAE": [],
         "MSE": [],
+        "MAE": [],
+        "AUC": [],
         "F-stat": [],
-        "AUC": []
+        "F-stat (statsmodels)": [],
+        "p (statsmodels)": []
     }
     for dataset in DATASETS:
         for split in SPLITS:

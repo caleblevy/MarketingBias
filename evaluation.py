@@ -13,15 +13,17 @@ def evaluate(model, eval_tokens):
     # TODO: Normalize to 1 (once we can run MF code, )
     data["rating_truth"] = 4*data["rating_truth"] + 1
     data["rating_inferred"] = 4*data["rating_inferred"] + 1
-    MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"], squared=False)
+    MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"])
     # print(output_dir)
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
-    F = f_stat(data, model)
+    F1, F2, P = f_stat(data, model)
     AUC = _auc(data['rating_truth'], data['rating_inferred'], 4)
     eval_tokens["MAE"].append(MAE)
     eval_tokens["MSE"].append(MSE)
-    eval_tokens["F-stat"].append(F)
+    eval_tokens["F-stat"].append(F1)
     eval_tokens["AUC"].append(AUC)
+    eval_tokens["F-stat (statsmodels)"].append(F2)
+    eval_tokens["p (statsmodels)"].append(P)
 
 
 def _auc(truth, inferred, threshold):
@@ -40,9 +42,7 @@ def f_stat(data, model):
     inferred_ratings = np.array(data["rating_inferred"])
     errors = true_ratings - inferred_ratings
     data['error'] = errors
-    data.fillna('unspecified')
-    # data.to_csv("throwaway/test.csv", index=False)
-    # data = pd.read_csv("throwaway/test.csv", converters={"model_attr": str, "user_attr": str})
+    data = data.dropna()
     user_attrs = data["user_attr"].dropna().unique()
     model_attrs = data["model_attr"].dropna().unique()
     M = len(user_attrs)
@@ -65,4 +65,4 @@ def f_stat(data, model):
     f1 = (V / (M * N - 1)) / (U / (data.shape[0] - (M * N)))
     f2, p2 = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
     # print(f1, f2, p2)
-    return f1
+    return f1, f2, p2
