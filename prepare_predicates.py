@@ -11,7 +11,7 @@ from sklearn.model_selection import KFold
 
 sys.path.insert(0, 'matrix_factorization')
 from main import mf_rating
-#from make_mf_into_predicate import make_mf_into_predicate
+from make_mf_into_predicate import make_mf_into_predicate
 
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = [
@@ -82,7 +82,7 @@ def main():
             json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
         if BASELINE_SPLIT:
             create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
-            #make_mf_into_predicate(dataset)
+            make_mf_into_predicate(dataset)
 
         # K-Fold
         kf = KFold(n_splits=NUM_SPLITS)
@@ -191,32 +191,6 @@ def _substitute_column(data, column_name, attr_map):
     if column_name != "rating":
         sub = sub.astype('Int64')
     return sub
-
-
-def _modify_data_splits(data, split, test_size, validation_size):
-    observations, test = train_test_split(data, test_size=test_size, random_state=split)
-    train, validation = train_test_split(observations, test_size=validation_size, random_state=split)
-
-    train = train.assign(split=0)
-    validation = validation.assign(split=1)
-    test = test.assign(split=2)
-
-    observations = train.append(validation)
-    data = observations.append(test)
-
-    return data
-
-
-def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings, compute_mf_ratings):
-    split_dir = predicate_dir / str(split)
-    split_dir.mkdir(exist_ok=True)
-    data = _modify_data_splits(data, split, eval_test_size, learn_test_size)
-    observations_eval = data.query('split == 0 | split == 1')
-    test_eval = data.query('split == 2')
-    observations_learn = data.query('split == 0')
-    test_learn = data.query('split == 1')
-    create_predicates(data, observations_eval, test_eval, split_dir / "eval", similarity_settings, mf=compute_mf_ratings)
-    create_predicates(observations_eval, observations_learn, test_learn, split_dir / "learn", similarity_settings)
 
 
 def create_predicates(full_data, train, test, output_dir, similarity_settings, mf=False):
