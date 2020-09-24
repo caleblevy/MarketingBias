@@ -85,7 +85,7 @@ def main():
             #make_mf_into_predicate(dataset)
 
         # K-Fold
-        kf = KFold(n_splits=NUM_SPLITS)
+        kf = KFold(n_splits=NUM_SPLITS, shuffle=True, random_state=0)
         for (train_index, test_index), split in zip(kf.split(data), range(kf.get_n_splits())):
             split_dir = predicate_dir / str(split)
             split_dir.mkdir(exist_ok=True)
