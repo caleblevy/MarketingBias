@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from itertools import product
 from pathlib import Path
 import os
 
@@ -17,7 +18,7 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-SPLITS = ["baseline_split", 0, 1]
+SPLITS = ["baseline_split", 0]
 
 PRINT_JAVA_OUTPUT = True
 RUN_MODEL = True
@@ -50,46 +51,19 @@ ADDITIONAL_JAVA_OPTIONS = [
 #   Parity: "Rating Parity Fairness",
 #   Value: "Rating Value Fairness"
 # }
-BASE_MODELS = [
+BASE_RULESETS = [
     ["Avg"],
     ["Avg", "Sim"],
-    ["MF"],
-    ["Avg", "MF", "Sim"],
+    # ["Avg", "Sim", "MF"],
 ]
 
 
-FAIRNESS_RULES = [
-    ["Parity"],
-    ["Value"],
-    ["Parity", "Value"]
+FAIRNESS_RULESETS = [
+    [],
+    ["Valparity"],
+    ["Errparity"],
+    ["Valparity", "Errparity"]
 ]
-
-
-MODELS = {
-    # "baseline": set(),
-    # "prior": {
-    #     "rating_priors"
-    # },
-    # "similarity": {
-    #     "rating_priors",
-    #     "similarities"
-    # },
-    # "mf_prior": {
-    #     "rating_priors",
-    #     "matrix_factorization_prior"
-    # },
-    # "mf_prior_similarity": {
-    #     "rating_priors",
-    #     "matrix_factorization_prior",
-    #     "similarities"
-    # },
-    "user_parity_fairness": {
-        "rating_priors",
-        "similarities",
-        "user_parity_fairness"
-    }
-}
-
 
 
 # TODO: deal with weight learning (separate data adding)
@@ -103,43 +77,51 @@ def main():
         "F-stat": []
     }
     for dataset in DATASETS:
-        eval_tokens["dataset"]
         for split in SPLITS:
             predicate_dir = DATA_DIR / dataset / "predicates" / str(split)
-            for model_name, ruleset in MODELS.items():
-                print(dataset, model_name, split)
-                if split != 'baseline_split' and 'mf' in model_name:
+            for base_rules, fairness_rules in product(BASE_RULESETS, FAIRNESS_RULESETS):
+                model_rule_names = []
+                model_rule_names.extend(base_rules)
+                model_rule_names.extend(fairness_rules)
+                model_name = ''.join(base_rules)
+                if fairness_rules:
+                    model_name += '_' + ''.join(fairness_rules)
+                if split != 'baseline_split' and 'MF' in model_rule_names:
                     continue
+                print(dataset, model_name, split)
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
-                model = make_model(model_name, predicate_dir, output_dir, ruleset)
+                model = make_model(model_name, predicate_dir, output_dir, model_rule_names)
                 if RUN_MODEL:
-                    results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
-                                          psl_config=ADDITIONAL_PSL_OPTIONS,
-                                          jvm_options=ADDITIONAL_JAVA_OPTIONS,
-                                          print_java_output=PRINT_JAVA_OUTPUT)
+                    if OVERWRITE_OLD_DATA or not output_dir.is_dir():
+                        results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
+                                              psl_config=ADDITIONAL_PSL_OPTIONS,
+                                              jvm_options=ADDITIONAL_JAVA_OPTIONS,
+                                              print_java_output=PRINT_JAVA_OUTPUT)
                 eval_tokens["dataset"].append(dataset)
                 eval_tokens["model"].append(model_name)
                 eval_tokens["split"].append(str(split))
                 evaluate(model, eval_tokens)
-                return  # TODO: Remove this
+                # return  # TODO: Remove this
     eval_df = pd.DataFrame(eval_tokens)
     print(eval_df)
-    eval_df.to_csv("evaluation.csv", index=False)
+    eval_df.to_csv("throwaway/evaluation.csv", index=False)
 
 
 def make_model(model_name, predicate_dir, output_dir, ruleset):
     model = Model(model_name, predicate_dir, output_dir)
     add_baselines(model)
-    if "rating_priors" in ruleset:
+    if "Avg" in ruleset:
         add_rating_priors(model)
-    if "matrix_factorization" in ruleset:
-        add_mf_priors(model)
-    if "similarities" in ruleset:
+    if "Sim" in ruleset:
         add_similarities(model)
-    if "user_parity_fairness" in ruleset:
+    if "MF" in ruleset:
+        add_mf_priors(model)
+    if "Valparity" in ruleset or "Errparity" in ruleset:
         _prepare_rating_fairness(model)
-        # _prepare_user_fairness(model)
-        # _prepare_item_fairness(model)
+        if "Valparity" in ruleset:
+            add_segment_rating_parity(model)
+        if "Errparity" in ruleset:
+            add_segment_rating_value_fairness(model)
     return model
 
 
@@ -217,12 +199,12 @@ def _prepare_rating_fairness(model):
 def add_segment_rating_parity(model):
     # TODO: Write out unique segments in a for-loop, since arithmetic rules don't support != predicate
     model.add_rule(
-        "10: TargetSegmentAvg(UG1, IG1) = TargetSegmentAvg(UG2, IG2)"
+        "10: TargetSegmentRatingAvg(UG1, IG1) = TargetSegmentRatingAvg(UG2, IG2)"
     )
 
 
 def add_segment_rating_value_fairness(model):
-    model.add_predicate("ObsSegmentRatingAvg", closed=False, size=2)
+    model.add_predicate("ObsSegmentRatingAvg", closed=True, size=2)
     model.add_rule(
         "10: TargetSegmentRatingAvg(UG1, IG1) - ObsSegmentRatingAvg(UG1, IG1) = TargetSegmentRatingAvg(UG2, IG2) - ObsSegmentRatingAvg(UG2, IG2)"
     )
