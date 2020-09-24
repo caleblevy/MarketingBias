@@ -54,7 +54,7 @@ ADDITIONAL_JAVA_OPTIONS = [
 BASE_RULESETS = [
     ["Avg"],
     ["Avg", "Sim"],
-    # ["Avg", "Sim", "MF"],
+    ["Avg", "Sim", "MF"],
 ]
 
 
@@ -116,7 +116,7 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
     if "Sim" in ruleset:
         add_similarities(model)
     if "MF" in ruleset:
-        add_mf_priors(model)
+        add_mf_prior(model)
     if "Valparity" in ruleset or "Errparity" in ruleset:
         _prepare_rating_fairness(model)
         if "Valparity" in ruleset:
