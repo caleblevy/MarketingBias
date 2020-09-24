@@ -17,12 +17,19 @@ def evaluate(model, eval_tokens):
     # print(output_dir)
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
     F = f_stat(data, model)
-    fpr, tpr, thresholds = roc_curve(data["rating_truth"], data["rating_inferred"], pos_label = 2)
-    AUC = auc(fpr, tpr)
+    AUC = _auc(data['rating_truth'], data['rating_inferred'], 4)
     eval_tokens["MAE"].append(MAE)
     eval_tokens["MSE"].append(MSE)
     eval_tokens["F-stat"].append(F)
     eval_tokens["AUC"].append(AUC)
+
+
+def _auc(truth, inferred, threshold):
+    truth = [int(x > threshold) for x in truth]
+    inferred = [int(x > threshold) for x in inferred]
+
+    fpr, tpr, thresholds = roc_curve(truth, inferred, pos_label=1)
+    return auc(fpr, tpr)
 
 
 def f_stat(data, model):
