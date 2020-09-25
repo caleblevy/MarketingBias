@@ -76,11 +76,14 @@ def main():
         "MSE": [],
         "MAE": [],
         "AUC": [],
-        "F-stat (Kyle)": [],
-        "F-stat (statsmodels - str)": [],
-        "p (statsmodels - str)": [],
-        "F-stat (statsmodels - no str)": [],
-        "p (statsmodels - no str)": []
+        "F-stat (Definition)": [],
+        "F-stat (Definition + StringCols)": [],
+        "F-stat (Definition + NaNSegment)": [],
+        "F-stat (Definition + NaNSegment + StringCols)": [],
+        "F-stat (Julian)": [],
+        "F-stat (Julian + StringCols)": [],
+        "F-stat (Julian + NaNSegment)": [],
+        "F-stat (Julian + NaNSegment + StringCols)": []
     }
     for dataset in DATASETS:
         for split in SPLITS:
