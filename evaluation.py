@@ -57,8 +57,8 @@ def evaluate(model, eval_tokens):
     eval_tokens["F-stat (Julian + StringCols)"].append(F_JULIAN_STRINGCOLS)
     eval_tokens["F-stat (Julian + NaNSegment)"].append(F_JULIAN_NANSEGMENT)
     eval_tokens["F-stat (Julian + NaNSegment + StringCols)"].append(F_JULIAN_NANSEGMENT_STRINGCOLS)
-    print(F_DEFINITION, F_DEFINITION_STRINGCOLS, F_DEFINITION_NANSEGMENT, F_DEFINITION_NANSEGMENT_STRINGCOLS)
-    print(F_JULIAN, F_JULIAN_STRINGCOLS, F_JULIAN_NANSEGMENT, F_JULIAN_NANSEGMENT_STRINGCOLS)
+    # print(F_DEFINITION, F_DEFINITION_STRINGCOLS, F_DEFINITION_NANSEGMENT, F_DEFINITION_NANSEGMENT_STRINGCOLS)
+    # print(F_JULIAN, F_JULIAN_STRINGCOLS, F_JULIAN_NANSEGMENT, F_JULIAN_NANSEGMENT_STRINGCOLS)
     # eval_tokens["F-stat (Kyle)"].append(F_KYLE)
     # eval_tokens["F-stat (statsmodels - str)"].append(F_A_STR)
     # eval_tokens["p (statsmodels - str)"].append(P_A_STR)
@@ -81,11 +81,11 @@ def f_stat_def(data):
     average_error = data["error"].mean()
     V = 0
     U = 0
-    print("---")
-    print(M, N)
+    # print("---")
+    # print(M, N)
     for m in user_attrs:
         for n in model_attrs:
-            print(m, n)
+            # print(m, n)
             market_segment = data[(data['user_attr'] == m) & (data['model_attr'] == n)]
             market_segment_average_error = market_segment['error'].mean()
             V += market_segment.shape[0] * (market_segment_average_error - average_error) ** 2
@@ -96,7 +96,7 @@ def f_stat_def(data):
                 u_market_segment += (error - market_segment_average_error) ** 2
 
             U += u_market_segment
-    print('---')
+    # print('---')
     f_kyle = (V / (M * N - 1)) / (U / (data.shape[0] - (M * N)))
     return f_kyle
 

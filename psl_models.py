@@ -18,10 +18,10 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
-SPLITS = ["baseline_split", 0]
+SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
 
 PRINT_JAVA_OUTPUT = True
-RUN_MODEL = True
+RUN_MODEL = False
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
 OVERWRITE_OLD_DATA = False
@@ -98,6 +98,8 @@ def main():
                 if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names):
                     continue
                 if "MFBaseline" in model_rule_names and fairness_rules:
+                    continue
+                if split not in {"baseline_split", 0, 1} and dataset == 'electronics':
                     continue
                 print(dataset, model_name, split)
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
