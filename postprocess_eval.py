@@ -17,8 +17,6 @@ def compute_stats(df):
 
 def postprocess():
     ev = pd.read_csv("throwaway/evaluation.csv")
-    ev = ev[["dataset", "model", "split", "MSE", "MAE", "AUC", "F-stat (Definition)"]]
-    ev = ev.rename(columns={"F-stat (Definition)": "F-stat"}, errors='raise')
     modcloth_baseline = ev.query("(dataset == 'modcloth') & (split == 'baseline_split')").drop(columns=["dataset", "split"])
     modcloth_random = ev.query("(dataset == 'modcloth') & (split != 'baseline_split')").drop(columns=["dataset"])
     electronics_baseline = ev.query("(dataset == 'electronics') & (split == 'baseline_split')").drop(columns=["dataset", "split"])
@@ -28,21 +26,26 @@ def postprocess():
     modcloth_random = compute_stats(modcloth_random)
     electronics_random = compute_stats(electronics_random)
 
-    width_baseline = len(modcloth_baseline.columns)
-    height_baseline = len(modcloth_baseline) + 1
-    width_random = len(modcloth_random.columns)
-    height_random = len(modcloth_random) + 1
+    width_mb = len(modcloth_baseline.columns)
+    height_mb = len(modcloth_baseline) + 1
+    width_mr = len(modcloth_random.columns)
+    height_mr = len(modcloth_random) + 1
+
+    width_eb = len(electronics_baseline.columns)
+    height_eb = len(electronics_baseline) + 1
+    width_er = len(electronics_random.columns)
+    height_er = len(electronics_random) + 1
 
     title_spacing = 1
     dataset_spacing = 2
     title_row_mb = 0
     start_row_mb = title_row_mb + title_spacing
-    title_row_mr = start_row_mb + height_baseline + dataset_spacing
+    title_row_mr = start_row_mb + height_mb + dataset_spacing
     start_row_mr = title_row_mr + title_spacing
 
-    title_row_eb = start_row_mr + height_random + dataset_spacing
+    title_row_eb = start_row_mr + height_mr + dataset_spacing
     start_row_eb = title_row_eb + title_spacing
-    title_row_er = start_row_eb + height_baseline + dataset_spacing
+    title_row_er = start_row_eb + height_eb + dataset_spacing
     start_row_er = title_row_er + title_spacing
 
     timestamp = datetime.now().strftime("%-m-%-d, %-I.%M %p")
@@ -56,15 +59,15 @@ def postprocess():
         worksheet = writer.sheets[sheet_name]
         # Increase wdith for model name
         worksheet.set_column(0, 0, 25)
-        for col in range(1, max(width_baseline, width_random)):
+        for col in range(1, max(width_mb, width_mr, width_eb, width_er)):
             worksheet.set_column(col, col, 15)
         big_font = workbook.add_format({'font_size': 15})
         for row in [title_row_mb, title_row_mr, title_row_eb, title_row_er]:
             worksheet.set_row(row, None, big_font)
-        worksheet.merge_range(title_row_mb, 0, title_row_mb, width_baseline-1, 'Modcloth (Baseline Split)')
-        worksheet.merge_range(title_row_mr, 0, title_row_mr, width_random-1, f"Modcloth (Average of {num_modcloth_splits} Random Splits)")
-        worksheet.merge_range(title_row_eb, 0, title_row_eb, width_baseline-1, f"Electronics (Baseline Split)")
-        worksheet.merge_range(title_row_er, 0, title_row_er, width_random-1, f"Electronics (Average of {num_electronics_splits} Random Splits)")
+        worksheet.merge_range(title_row_mb, 0, title_row_mb, width_mb-1, 'Modcloth (Baseline Split)')
+        worksheet.merge_range(title_row_mr, 0, title_row_mr, width_mr-1, f"Modcloth (Average of {num_modcloth_splits} Random Splits)")
+        worksheet.merge_range(title_row_eb, 0, title_row_eb, width_eb-1, f"Electronics (Baseline Split)")
+        worksheet.merge_range(title_row_er, 0, title_row_er, width_er-1, f"Electronics (Average of {num_electronics_splits} Random Splits)")
 
 
 if __name__ == '__main__':

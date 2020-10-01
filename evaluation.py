@@ -2,8 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error, mean_absolute_error, auc, roc_curve
 import statsmodels as sm
-import statsmodels.api as sm
-from statsmodels.formula.api import ols
+
 
 
 def evaluate(model, eval_tokens):
@@ -23,46 +22,16 @@ def evaluate(model, eval_tokens):
     data = data.merge(item_group, on="item_id", how="left").merge(user_group, on="user_id", how="left")
     # Get missing, string, and missing + string
     data_ = data.dropna()
-    data_["user_attr"] = data_["user_attr"].astype(int)
-    data_nansegment = data.copy()
-    data_nansegment['user_attr'].loc[data_nansegment['user_attr'].isna()] = 3
-    data_nansegment['user_attr'] = data_nansegment['user_attr'].astype(int)
-    data_stringcols = data_.copy()
-    data_stringcols['user_attr'] = data_stringcols['user_attr'].astype(str)
-    data_stringcols['model_attr'] = data_stringcols['model_attr'].astype(str)
-    data_nansegment_stringcols = data_nansegment.copy()
-    data_nansegment_stringcols['user_attr'] = data_nansegment_stringcols['user_attr'].astype(str)
-    data_nansegment_stringcols['model_attr'] = data_nansegment_stringcols['model_attr'].astype(str)
     # TODO: Normalize to 1 (once we can run MF code, )
     MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"])
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
     AUC = _auc(data['rating_truth'], data['rating_inferred'], 4)
-    F_DEFINITION = f_stat_def(data_)
-    F_DEFINITION_STRINGCOLS = f_stat_def(data_stringcols)
-    F_DEFINITION_NANSEGMENT = f_stat_def(data_nansegment)
-    F_DEFINITION_NANSEGMENT_STRINGCOLS = f_stat_def(data_nansegment_stringcols)
-    F_JULIAN = f_stat_julian(data_)
-    F_JULIAN_STRINGCOLS = f_stat_julian(data_stringcols)
-    F_JULIAN_NANSEGMENT = f_stat_julian(data_nansegment)
-    F_JULIAN_NANSEGMENT_STRINGCOLS = f_stat_julian(data_nansegment_stringcols)
+    F_STAT = f_stat_def(data_)
     # Now for testing purposes
     eval_tokens["MAE"].append(MAE)
     eval_tokens["MSE"].append(MSE)
     eval_tokens["AUC"].append(AUC)
-    eval_tokens["F-stat (Definition)"].append(F_DEFINITION)
-    eval_tokens["F-stat (Definition + StringCols)"].append(F_DEFINITION_STRINGCOLS)
-    eval_tokens["F-stat (Definition + NaNSegment)"].append(F_DEFINITION_NANSEGMENT)
-    eval_tokens["F-stat (Definition + NaNSegment + StringCols)"].append(F_DEFINITION_NANSEGMENT_STRINGCOLS)
-    eval_tokens["F-stat (Julian)"].append(F_JULIAN)
-    eval_tokens["F-stat (Julian + StringCols)"].append(F_JULIAN_STRINGCOLS)
-    eval_tokens["F-stat (Julian + NaNSegment)"].append(F_JULIAN_NANSEGMENT)
-    eval_tokens["F-stat (Julian + NaNSegment + StringCols)"].append(F_JULIAN_NANSEGMENT_STRINGCOLS)
-    # print(F_DEFINITION, F_DEFINITION_STRINGCOLS, F_DEFINITION_NANSEGMENT, F_DEFINITION_NANSEGMENT_STRINGCOLS)
-    # print(F_JULIAN, F_JULIAN_STRINGCOLS, F_JULIAN_NANSEGMENT, F_JULIAN_NANSEGMENT_STRINGCOLS)
-    # eval_tokens["F-stat (Kyle)"].append(F_KYLE)
-    # eval_tokens["F-stat (statsmodels - str)"].append(F_A_STR)
-    # eval_tokens["p (statsmodels - str)"].append(P_A_STR)
-    # print(F_KYLE, F_A_STR, P_A_STR, F_A_NOSTR, P_A_NOSTR)
+    eval_tokens["F-stat"].append(F_STAT)
 
 
 def _auc(truth, inferred, threshold):
@@ -102,5 +71,8 @@ def f_stat_def(data):
 
 
 def f_stat_julian(data):
+    import statsmodels
+    import statsmodels.api as sm
+    from statsmodels.formula.api import ols
     f, p = sm.stats.anova_lm(ols('error ~ model_attr*user_attr - model_attr - user_attr', data=data).fit()).values[0, -2:]
     return f

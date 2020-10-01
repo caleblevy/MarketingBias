@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent.absolute() / "datasets"
 RESULT_DIR = Path(__file__).parent.absolute() / "results"
 DATASETS = [
     "modcloth",
-    "electronics"
+    # "electronics"
 ]
 SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
 
@@ -76,19 +76,12 @@ def main():
         "MSE": [],
         "MAE": [],
         "AUC": [],
-        "F-stat (Definition)": [],
-        "F-stat (Definition + StringCols)": [],
-        "F-stat (Definition + NaNSegment)": [],
-        "F-stat (Definition + NaNSegment + StringCols)": [],
-        "F-stat (Julian)": [],
-        "F-stat (Julian + StringCols)": [],
-        "F-stat (Julian + NaNSegment)": [],
-        "F-stat (Julian + NaNSegment + StringCols)": []
+        "F-stat": [],
     }
     for dataset in DATASETS:
         for split in SPLITS:
             predicate_dir = DATA_DIR / dataset / "predicates" / str(split)
-            for base_rules, fairness_rules in product(BASE_RULESETS, FAIRNESS_RULESETS):
+            for fairness_rules, base_rules in product(FAIRNESS_RULESETS, BASE_RULESETS):
                 model_rule_names = []
                 model_rule_names.extend(base_rules)
                 model_rule_names.extend(fairness_rules)
