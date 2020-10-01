@@ -16,14 +16,30 @@ DATA_DIR = Path(__file__).parent.absolute() / "datasets"
 RESULT_DIR = Path(__file__).parent.absolute() / "results"
 DATASETS = [
     "modcloth",
-    # "electronics"
+    "electronics"
 ]
+
+
+BASE_RULESETS = [
+    ["MFBaseline"],
+    ["Avg"],
+    ["Avg", "Sim"],
+    ["Avg", "Sim", "MF"],
+]
+
+FAIRNESS_RULESETS = [
+    [],
+    ["Valparity"],
+    ["Errparity"],
+    ["Valparity", "Errparity"]
+]
+
 SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
 
 PRINT_JAVA_OUTPUT = True
-RUN_MODEL = False
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
+RUN_MODEL = False
 OVERWRITE_OLD_DATA = False
 # DRY_RUN = True
 
@@ -51,20 +67,6 @@ ADDITIONAL_JAVA_OPTIONS = [
 #   Parity: "Rating Parity Fairness",
 #   Value: "Rating Value Fairness"
 # }
-BASE_RULESETS = [
-    ["MFBaseline"],
-    ["Avg"],
-    ["Avg", "Sim"],
-    ["Avg", "Sim", "MF"],
-]
-
-
-FAIRNESS_RULESETS = [
-    [],
-    ["Valparity"],
-    ["Errparity"],
-    ["Valparity", "Errparity"]
-]
 
 
 # TODO: deal with weight learning (separate data adding)
@@ -88,11 +90,11 @@ def main():
                 model_name = ''.join(base_rules)
                 if fairness_rules:
                     model_name += '_' + ''.join(fairness_rules)
-                if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names):
+                if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names):  # TODO: Eliminate this
                     continue
                 if "MFBaseline" in model_rule_names and fairness_rules:
                     continue
-                if split not in {"baseline_split", 0, 1} and dataset == 'electronics':
+                if split not in {"baseline_split", 0, 1} and dataset == 'electronics':  # TODO: Eliminate this
                     continue
                 print(dataset, model_name, split)
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
@@ -115,7 +117,11 @@ def main():
 
 def make_model(model_name, predicate_dir, output_dir, ruleset):
     model = Model(model_name, predicate_dir, output_dir)
-    add_baselines(model)
+    add_predicate_paths(model)
+    if "MFBaseline" in ruleset:
+        mf_baseline(model)
+    else:
+        add_negative_prior(model)
     if "Avg" in ruleset:
         add_rating_priors(model)
     if "Sim" in ruleset:
@@ -128,12 +134,10 @@ def make_model(model_name, predicate_dir, output_dir, ruleset):
             add_segment_rating_parity(model)
         if "Errparity" in ruleset:
             add_segment_rating_value_fairness(model)
-    if "MFBaseline" in ruleset:
-        mf_baseline(model)
     return model
 
 
-def add_baselines(model):
+def add_predicate_paths(model):
     model.add_predicate("Rating", size=2, closed=False)
     model.add_predicate("ItemGroup", size=2, closed=True)
     model.add_predicate("UserGroup", size=2, closed=True)
@@ -141,7 +145,9 @@ def add_baselines(model):
     model.add_predicate("ValidItemGroup", size=1, closed=True)
     model.add_predicate("Rated", size=2, closed=True)
     model.add_predicate("Target", size=2, closed=True)
-    # Negative prior
+
+
+def add_negative_prior(model):
     model.add_rule("1: !Rating(U,I) ^2")
 
 
