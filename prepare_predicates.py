@@ -15,9 +15,9 @@ from make_mf_into_predicate import make_mf_into_predicate
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = [
     "modcloth",
-    # "electronics"
+    "electronics"
 ]
-BASELINE_SPLIT = False
+BASELINE_SPLIT = True
 COMPUTE_MF_RATINGS = True
 NUM_SPLITS = 5
 EVAL_TRAIN_TEST_RATIO = 80 / 20

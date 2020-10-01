@@ -56,7 +56,7 @@ ADDITIONAL_CLI_OPTIONS = [
 ]
 
 ADDITIONAL_JAVA_OPTIONS = [
-    "-Xmx8G",
+    "-Xmx9G",
 ]
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
@@ -91,8 +91,6 @@ def main():
                 model_name = ''.join(base_rules)
                 if fairness_rules:
                     model_name += '_' + ''.join(fairness_rules)
-                if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names) and (dataset == 'electronics'):  # TODO: Eliminate this
-                    continue
                 if "MFBaseline" in model_rule_names and fairness_rules:
                     continue
                 if split not in {"baseline_split", 0, 1} and dataset == 'electronics':  # TODO: Eliminate this
