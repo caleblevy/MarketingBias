@@ -15,11 +15,11 @@ from make_mf_into_predicate import make_mf_into_predicate
 DATASETS_DIR = Path(__file__).parent.absolute() / "datasets"
 DATASETS = [
     "modcloth",
-    "electronics"
+    # "electronics"
 ]
-BASELINE_SPLIT = True
-COMPUTE_MF_RATINGS = False
-NUM_SPLITS = 1
+BASELINE_SPLIT = False
+COMPUTE_MF_RATINGS = True
+NUM_SPLITS = 5
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -308,7 +308,7 @@ def _make_cosine_similarity_predicate(predicate_name, data, output_dir, similari
 
 def _make_mf_predicate(data, output_dir):
     ratings = mf_rating(data)
-    _write_predicate('MFRatings', ratings, output_dir)
+    _write_predicate('MFRating', ratings, output_dir)
 
 
 def _write_predicate(predicate_name, data, output_dir):

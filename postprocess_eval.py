@@ -5,8 +5,8 @@ from toolz import interleave
 
 
 def compute_stats(df):
-    means = df.groupby(["model"]).mean().add_prefix("Average ").reset_index()
-    std = df.groupby(["model"]).std(ddof=0).add_suffix(" (STD)").reset_index()
+    means = df.groupby(["model"], sort=False).mean().add_prefix("Average ").reset_index()
+    std = df.groupby(["model"], sort=False).std(ddof=0).add_suffix(" (STD)").reset_index()
     model = means["model"]
     means = means.drop(columns=["model"])
     std = std.drop(columns=["model"])

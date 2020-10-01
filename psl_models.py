@@ -8,6 +8,7 @@ import pandas as pd
 
 from _pslmodel import Model
 from evaluation import evaluate
+from postprocess_eval import postprocess
 
 # TODO: Model.PSL_JAR_PATH to custom in repository
 # TODO: Figure out how capture logging out
@@ -39,7 +40,7 @@ SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
 PRINT_JAVA_OUTPUT = True
 
 # TODO Switch these to argparse commands --overwrite and --dry-run
-RUN_MODEL = False
+RUN_MODEL = True
 OVERWRITE_OLD_DATA = False
 # DRY_RUN = True
 
@@ -90,7 +91,7 @@ def main():
                 model_name = ''.join(base_rules)
                 if fairness_rules:
                     model_name += '_' + ''.join(fairness_rules)
-                if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names):  # TODO: Eliminate this
+                if split != 'baseline_split' and ('MF' in model_rule_names or 'MFBaseline' in model_rule_names) and (dataset == 'electronics'):  # TODO: Eliminate this
                     continue
                 if "MFBaseline" in model_rule_names and fairness_rules:
                     continue
@@ -113,6 +114,7 @@ def main():
     eval_df = pd.DataFrame(eval_tokens)
     print(eval_df)
     eval_df.to_csv("throwaway/evaluation.csv", index=False)
+    postprocess()
 
 
 def make_model(model_name, predicate_dir, output_dir, ruleset):
