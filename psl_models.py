@@ -56,7 +56,7 @@ ADDITIONAL_CLI_OPTIONS = [
 ]
 
 ADDITIONAL_JAVA_OPTIONS = [
-    "-Xmx9G",
+    "-Xmx10G",
 ]
 
 # TODO: If there are too many shared models, we can make "shared models" global variable
@@ -93,13 +93,11 @@ def main():
                     model_name += '_' + ''.join(fairness_rules)
                 if "MFBaseline" in model_rule_names and fairness_rules:
                     continue
-                if split not in {"baseline_split", 0, 1} and dataset == 'electronics':  # TODO: Eliminate this
-                    continue
                 print(dataset, model_name, split)
                 output_dir = RESULT_DIR / dataset / model_name / str(split)
                 model = make_model(model_name, predicate_dir, output_dir, model_rule_names)
                 if RUN_MODEL:
-                    if OVERWRITE_OLD_DATA or not output_dir.is_dir():
+                    if OVERWRITE_OLD_DATA or not (output_dir / "inferred_predicates").is_dir():
                         results = model.infer(additional_cli_options=ADDITIONAL_CLI_OPTIONS,
                                               psl_config=ADDITIONAL_PSL_OPTIONS,
                                               jvm_options=ADDITIONAL_JAVA_OPTIONS,
