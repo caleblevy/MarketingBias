@@ -10,16 +10,15 @@ from _pslmodel import Model
 from evaluation import evaluate
 from postprocess_eval import postprocess
 
+
 # TODO: Model.PSL_JAR_PATH to custom in repository
 # TODO: Figure out how capture logging out
 
-DATA_DIR = Path(__file__).parent.absolute() / "datasets"
-RESULT_DIR = Path(__file__).parent.absolute() / "results"
+
 DATASETS = [
     "modcloth",
     "electronics"
 ]
-
 
 BASE_RULESETS = [
     ["MFBaseline"],
@@ -59,15 +58,9 @@ ADDITIONAL_JAVA_OPTIONS = [
     "-Xmx10G",
 ]
 
-# TODO: If there are too many shared models, we can make "shared models" global variable
 
-# Abbrevs = {
-#   Avg: "Average Rating Prior",
-#   MF: "Matrix Factorization",
-#   Sim: "Similarity",
-#   Parity: "Rating Parity Fairness",
-#   Value: "Rating Value Fairness"
-# }
+DATA_DIR = Path(__file__).parent.absolute() / "datasets"
+RESULT_DIR = Path(__file__).parent.absolute() / "results"
 
 
 # TODO: deal with weight learning (separate data adding)
@@ -78,8 +71,10 @@ def main():
         "split": [],
         "MSE": [],
         "MAE": [],
-        "AUC": [],
         "F-stat": [],
+        "AUC-ROC": [],
+        "Pos Class AUPRC": [],
+        "Neg Class AUPRC": [],
     }
     for dataset in DATASETS:
         for split in SPLITS:

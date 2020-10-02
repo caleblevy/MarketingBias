@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_squared_error, mean_absolute_error, auc, roc_curve
+from sklearn.metrics import mean_squared_error, mean_absolute_error, auc, roc_curve, average_precision_score
 import statsmodels as sm
 
+
+RATING_THRESHOLD = 3
 
 
 def evaluate(model, eval_tokens):
@@ -25,21 +27,33 @@ def evaluate(model, eval_tokens):
     # TODO: Normalize to 1 (once we can run MF code, )
     MSE = mean_squared_error(data["rating_truth"], data["rating_inferred"])
     MAE = mean_absolute_error(data["rating_truth"], data["rating_inferred"])
-    AUC = _auc(data['rating_truth'], data['rating_inferred'], 4)
+    AUC_ROC = auc_roc(data['rating_truth'], data['rating_inferred'], RATING_THRESHOLD)
+    AUPRC_POS, AUPRC_NEG = au_prc(data['rating_truth'], data['rating_inferred'], RATING_THRESHOLD)
     F_STAT = f_stat_def(data_)
     # Now for testing purposes
     eval_tokens["MAE"].append(MAE)
     eval_tokens["MSE"].append(MSE)
-    eval_tokens["AUC"].append(AUC)
     eval_tokens["F-stat"].append(F_STAT)
+    eval_tokens["AUC-ROC"].append(AUC_ROC)
+    eval_tokens["Pos Class AUPRC"].append(AUPRC_POS)
+    eval_tokens["Neg Class AUPRC"].append(AUPRC_NEG)
 
 
-def _auc(truth, inferred, threshold):
-    truth = [int(x > threshold) for x in truth]
-    inferred = [int(x > threshold) for x in inferred]
+
+def auc_roc(truth, inferred, threshold):
+    truth = [int(x >= threshold) for x in truth]
+    inferred = [int(x >= threshold) for x in inferred]
 
     fpr, tpr, thresholds = roc_curve(truth, inferred, pos_label=1)
     return auc(fpr, tpr)
+
+
+def au_prc(truth, inferred, threshold):
+    truth = np.array([int(x >= threshold) for x in truth])
+    inferred = np.array([int(x >= threshold) for x in inferred])
+    pos_auprc = average_precision_score(truth, inferred, pos_label=1)
+    neg_auprc = average_precision_score(1 - truth, 1 - inferred, pos_label=1)
+    return pos_auprc, neg_auprc
 
 
 def f_stat_def(data):

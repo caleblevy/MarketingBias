@@ -6,7 +6,7 @@ from toolz import interleave
 
 def compute_stats(df):
     means = df.groupby(["model"], sort=False).mean().add_prefix("Average ").reset_index()
-    std = df.groupby(["model"], sort=False).std(ddof=0).add_suffix(" (STD)").reset_index()
+    std = df.groupby(["model"], sort=False).std().add_suffix(" (STD)").reset_index()
     model = means["model"]
     means = means.drop(columns=["model"])
     std = std.drop(columns=["model"])
@@ -48,7 +48,7 @@ def postprocess():
     title_row_er = start_row_eb + height_eb + dataset_spacing
     start_row_er = title_row_er + title_spacing
 
-    timestamp = datetime.now().strftime("%-m-%-d, %-I.%M %p")
+    timestamp = datetime.now().strftime("%d-%b-%y, %-I.%M %p")
     with pd.ExcelWriter("throwaway/evaluation.xlsx") as writer:
         sheet_name = f"Evaluation ({timestamp})"
         modcloth_baseline.to_excel(writer, sheet_name=sheet_name, startrow=start_row_mb, index=False, float_format="%.4f")  # Need to create the worksheet to access it
@@ -59,8 +59,10 @@ def postprocess():
         worksheet = writer.sheets[sheet_name]
         # Increase wdith for model name
         worksheet.set_column(0, 0, 25)
-        for col in range(1, max(width_mb, width_mr, width_eb, width_er)):
-            worksheet.set_column(col, col, 15)
+        num_cols = max(width_mb, width_mr, width_eb, width_er)
+        for col in range(1, num_cols):
+            ending_col_pad = 5*((num_cols - col) <= 6) + 5*((num_cols - col) <= 4)  # TODO: This is a total hack that works because of lucky alignment of where stretched columns are. Fix this if/when we ahve time.
+            worksheet.set_column(col, col, 15 + ending_col_pad)
         big_font = workbook.add_format({'font_size': 15})
         for row in [title_row_mb, title_row_mr, title_row_eb, title_row_er]:
             worksheet.set_row(row, None, big_font)
