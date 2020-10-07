@@ -17,9 +17,12 @@ DATASETS = [
     "modcloth",
     "electronics"
 ]
+
+OVERWRITE = True
 BASELINE_SPLIT = True
 COMPUTE_MF_RATINGS = True
-NUM_SPLITS = 5
+NUM_RANDOM_SPLITS = 5
+NUM_ACTIVE_USER_SPLITS = 5
 EVAL_TRAIN_TEST_RATIO = 80 / 20
 LEARN_TRAIN_TEST_RATIO = 90 / 10
 
@@ -80,16 +83,57 @@ def main():
         with open(predicate_dir / "similarity_settings.json", 'w', encoding='utf-8') as f:
             json.dump(similarity_settings, f, ensure_ascii=False, indent=4)
         if BASELINE_SPLIT:
-            create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
-            make_mf_into_predicate(dataset)
-        for split in range(NUM_SPLITS):
+            # TODO: Get rid of duplicate instantiation of split directory
+            if OVERWRITE or not (predicate_dir / "baseline_split").is_dir():
+                create_baseline_split(data, predicate_dir, similarity_settings=similarity_settings)
+                make_mf_into_predicate(dataset)
+        for split in range(NUM_RANDOM_SPLITS):
             # TODO: Create validation, look into cross-validation
             # TODO: Select proper random seeds
-            create_random_split(data, predicate_dir, split,
-                         eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
-                         learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
-                         similarity_settings=similarity_settings,
-                         compute_mf_ratings=COMPUTE_MF_RATINGS)
+            # TODO: Extract split random_state from last chracter of folder name
+            if OVERWRITE or not (predicate_dir / f"random_{split}").is_dir():
+                create_random_split(data, predicate_dir, split,
+                                    eval_test_size=1/(1+EVAL_TRAIN_TEST_RATIO),
+                                    learn_test_size=1/(1+LEARN_TRAIN_TEST_RATIO),
+                                    similarity_settings=similarity_settings,
+                                    compute_mf_ratings=COMPUTE_MF_RATINGS)
+        for split in range(NUM_ACTIVE_USER_SPLITS):
+            if OVERWRITE or not (predicate_dir / f"active-user_{split}").is_dir():
+                create_active_user_split(data, predicate_dir, split, similarity_settings, COMPUTE_MF_RATINGS)
+
+
+# TODO: Combine this with _create_random_split
+def create_active_user_split(data, predicate_dir, split, similarity_settings, compute_mf_ratings):
+    split_dir = predicate_dir / f"active-user_{split}"
+    data = _modify_active_splits(data, split)
+    split_dir.mkdir(exist_ok=True)
+    observations_eval = data.query('split == 0 | split == 1')
+    test_eval = data.query('split == 2')
+    observations_learn = data.query('split == 0')
+    test_learn = data.query('split == 1')
+    create_predicates(data, observations_eval, test_eval, split_dir / "eval", similarity_settings, mf=compute_mf_ratings)
+    create_predicates(observations_eval, observations_learn, test_learn, split_dir / "learn", similarity_settings)
+
+
+def _modify_active_splits(data, split):
+    user_counts = data[["user_id"]].value_counts().reset_index(name="num_ratings")
+    active_users = user_counts.query("num_ratings >= 2").drop(columns=["num_ratings"])
+    val_test_pool = data.merge(active_users)
+    test = val_test_pool.groupby("user_id", as_index=False).sample(random_state=split)
+    very_active_users = user_counts.query("num_ratings >= 3").drop(columns=["num_ratings"])
+    val_pool = (val_test_pool.merge(test[["user_id", "item_id"]], how='left', indicator=True)
+                             .query('_merge == "left_only"')
+                             .drop('_merge', 1)
+                             .merge(very_active_users))
+    validation = val_pool.groupby("user_id", as_index=False).sample(random_state=split)
+    val_test = pd.concat([validation, test], ignore_index=True)
+    train = (data.merge(val_test[["user_id", "item_id"]], how="left", indicator=True)
+                 .query('_merge == "left_only"')
+                 .drop('_merge', 1))
+    train = train.assign(split=0)
+    validation = validation.assign(split=1)
+    test = test.assign(split=2)
+    return pd.concat([train, validation, test], ignore_index=True)
 
 
 def create_baseline_split(data, predicate_dir, similarity_settings):
@@ -173,7 +217,7 @@ def _modify_data_splits(data, split, test_size, validation_size):
 
 
 def create_random_split(data, predicate_dir, split, eval_test_size, learn_test_size, similarity_settings, compute_mf_ratings):
-    split_dir = predicate_dir / str(split)
+    split_dir = predicate_dir / f"random_{split}"
     split_dir.mkdir(exist_ok=True)
     data = _modify_data_splits(data, split, eval_test_size, learn_test_size)
     observations_eval = data.query('split == 0 | split == 1')

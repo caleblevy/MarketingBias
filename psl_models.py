@@ -34,7 +34,7 @@ FAIRNESS_RULESETS = [
     ["Valparity", "Errparity"]
 ]
 
-SPLITS = ["baseline_split", 0, 1, 2, 3, 4]
+SPLITS = ["baseline_split", "random_0", "random_1", "random_2", "random_3", "random_4", "active-user_0", "active-user_1", "active-user_2", "active-user_3", "active-user_4"]
 
 PRINT_JAVA_OUTPUT = True
 
@@ -78,7 +78,7 @@ def main():
     }
     for dataset in DATASETS:
         for split in SPLITS:
-            predicate_dir = DATA_DIR / dataset / "predicates" / str(split)
+            predicate_dir = DATA_DIR / dataset / "predicates" / split
             for fairness_rules, base_rules in product(FAIRNESS_RULESETS, BASE_RULESETS):
                 model_rule_names = []
                 model_rule_names.extend(base_rules)
