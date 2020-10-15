@@ -102,7 +102,7 @@ def postprocess():
         worksheet.merge_range(title_row_mb, 0, title_row_mb, width_mb-1, 'Modcloth (Baseline Split)')
         worksheet.merge_range(title_row_ma, 0, title_row_ma, width_mr-1, f"Modcloth (Average of {num_splits_mr} Active User Splits)")
         worksheet.merge_range(title_row_mr, 0, title_row_mr, width_mr-1, f"Modcloth (Average of {num_splits_mr} Random Splits)")
-        worksheet.merge_range(title_row_eb, 0, title_row_eb, width_eb-1, f"Electronics (Baseline Split)")
+        worksheet.merge_range(title_row_eb, 0, title_row_eb, width_eb-1, "Electronics (Baseline Split)")
         worksheet.merge_range(title_row_ea, 0, title_row_ea, width_mr-1, f"Electronics (Average of {num_splits_mr} Active User Splits)")
         worksheet.merge_range(title_row_er, 0, title_row_er, width_er-1, f"Electronics (Average of {num_splits_er} Random Splits)")
 
